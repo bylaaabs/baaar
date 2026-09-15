@@ -1,0 +1,36 @@
+name: baaar
+
+options:
+  bundleIdPrefix: com.aaangelmartin
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: 3862GT8D5W
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "Apple Development"
+    ENABLE_HARDENED_RUNTIME: YES
+    DEAD_CODE_STRIPPING: YES
+    SWIFT_STRICT_CONCURRENCY: complete
+
+targets:
+  baaar:
+    type: application
+    platform: macOS
+    sources:
+      - path: baaar
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aaangelmartin.baaar
+        PRODUCT_NAME: baaar
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_LSUIElement: YES
+        INFOPLIST_KEY_CFBundleDisplayName: baaar
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+        INFOPLIST_KEY_NSHumanReadableCopyright: "© 2026 Ángel Martín"
