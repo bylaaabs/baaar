@@ -157,8 +157,9 @@ final class AppModel {
                 name: item.isOwn ? (item.identifier == ControlItems.Identifier.chevron ? "baaar chevron" : "baaar") : item.displayName,
                 section: item.sectionKey.map(Settings.section(forBundle:)) ?? .visible,
                 sectionKey: item.sectionKey,
-                image: controller.images.image(for: item),
-                appIcon: item.appIcon,
+                // baaar's own items and Apple's have no useful app icon; the clock's picture would show a frozen time.
+                image: item.isOwn || item.systemItem == .clock ? nil : controller.images.image(for: item),
+                appIcon: item.isOwn || item.bundleIdentifier == MenuBarItem.menuBarAgent ? nil : item.appIcon,
                 symbolName: Self.symbolName(for: item),
                 canHide: item.sectionKey != nil && !item.isOwn && !isAppleModule,
                 canReorder: hasLayoutAccess && entry.weight != nil
@@ -178,6 +179,7 @@ final class AppModel {
     func refreshPermissions() {
         hasAccessibility = Permissions.hasAccessibility
         hasScreenRecording = Permissions.hasScreenRecording
+        hasLayoutAccess = MenuBarLayoutTable.hasAccess
     }
 
     func requestAccessibility() {

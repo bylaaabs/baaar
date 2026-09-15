@@ -1,13 +1,22 @@
 import AppKit
-import CoreTransferable
 import SwiftUI
-import UniformTypeIdentifiers
 
+/// The menu bar layout editor: three strips in menu bar order. Drag to reorder, or between strips to hide.
 struct LayoutPane: View {
     let model: AppModel
     let reloader: ModelReloader
 
+    /// The layout as the last drop left it, shown until the model reads the menu bar back.
+    @State private var draft: LayoutDraft?
+    @State private var draftGeneration = 0
+    @State private var drag = LayoutDragSession()
+
+    private var items: [AppModel.LayoutItem] {
+        draft?.apply(to: model.layoutItems) ?? model.layoutItems
+    }
+
     var body: some View {
+        let items = items
         VStack(alignment: .leading, spacing: 24) {
             header
 
@@ -15,8 +24,8 @@ struct LayoutPane: View {
                 BrandCallout(
                     systemImage: "exclamationmark.triangle",
                     tint: BrandColors.danger,
-                    title: "hiding is not available on this Mac",
-                    message: "this version of macOS does not let baaar hide menu bar items, so every section stays visible."
+                    title: "hiding is not available on this mac",
+                    message: "this version of macos doesn't let baaar hide menu bar items, so every item stays visible."
                 )
             }
 
@@ -30,35 +39,55 @@ struct LayoutPane: View {
                 )
             }
 
-            ForEach(MenuBarSection.allCases, id: \.self) { section in
-                SectionBar(section: section, groups: model.groups(in: section)) { id in
-                    move(id, to: section)
-                } onMove: { id, target in
-                    move(id, to: target)
-                }
+            if !model.hasLayoutAccess {
+                BrandCallout(
+                    systemImage: "arrow.left.arrow.right",
+                    title: "reordering needs layout access",
+                    message: "reordering needs access to the menu bar layout file. select com.apple.MenuBar.plist once and baaar can move items without touching your cursor.",
+                    actionTitle: "grant access",
+                    action: model.requestLayoutAccess
+                )
             }
 
-            Text("every icon one tool puts in the menu bar moves together. Apple's items listed here can be hidden one by one; other Apple items, like focus or fast user switching, disappear while anything is hidden.")
+            ForEach(MenuBarSection.allCases, id: \.self) { section in
+                LayoutStrip(
+                    section: section,
+                    items: items.filter { $0.section == section },
+                    allItems: items,
+                    drag: drag,
+                    onDragStart: beginDrag,
+                    onPlace: { id, index in place(id, in: section, at: index, items: items) },
+                    menu: { item in menuItems(for: item, items: items) }
+                )
+            }
+
+            Text("apple items other than wi-fi, bluetooth, battery, sound, displays, keyboard, screen mirroring, clock and control center can't be hidden: macos hides them itself while anything is hidden.")
                 .font(.brandCaption)
                 .foregroundStyle(BrandColors.onTertiary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .task { reloader.reloadIfStale() }
-    }
-
-    /// Like `AppModel.move`, but a burst of drops shares one reload instead of re-reading the menu bar per drop.
-    private func move(_ bundleIdentifier: String, to section: MenuBarSection) {
-        model.controller?.setSection(section, forBundle: bundleIdentifier)
-        reloader.request()
+        .onChange(of: model.layoutItems) {
+            // The read-back of an earlier drop, or of this one once MenuBarAgent has re-sorted.
+            if let draft, ContinuousClock.now - draft.createdAt >= .milliseconds(350) {
+                self.draft = nil
+            }
+        }
+        .task(id: draftGeneration) {
+            // If the read-back never changes anything, stop pretending after a moment.
+            let generation = draftGeneration
+            try? await Task.sleep(for: .seconds(2.5))
+            if draft?.generation == generation { draft = nil }
+        }
     }
 
     private var header: some View {
         HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("drag items between sections")
+                Text("arrange your menu bar")
                     .font(.brandHeadline)
                     .foregroundStyle(BrandColors.on)
-                Text("right-click an item to move it without dragging.")
+                Text("drag to reorder, or between strips to hide. every icon from the same tool moves together.")
                     .font(.brandCaption)
                     .foregroundStyle(BrandColors.onSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -80,207 +109,145 @@ struct LayoutPane: View {
             .disabled(model.isRefreshing)
         }
     }
+
+    // MARK: - Moving
+
+    private func beginDrag(_ id: String) {
+        drag.itemID = id
+        Task {
+            // SwiftUI doesn't report a drag that ends outside a drop target; watch the mouse button instead.
+            while NSEvent.pressedMouseButtons & 1 != 0 {
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            try? await Task.sleep(for: .milliseconds(250))
+            if drag.itemID == id { drag.itemID = nil }
+        }
+    }
+
+    /// Places an item at `index` among the other items of `section` as shown, left to right.
+    private func place(_ id: String, in section: MenuBarSection, at index: Int, items: [AppModel.LayoutItem]) {
+        drag.itemID = nil
+        guard let item = items.first(where: { $0.id == id }), item.canHide || section == .visible else { return }
+        let neighbours = items.filter { $0.section == section && $0.id != id }
+        let index = min(max(index, 0), neighbours.count)
+        if item.section == section {
+            let current = items.filter { $0.section == section }.firstIndex { $0.id == id }
+            guard item.canReorder, current != index else { return }
+        }
+
+        draftGeneration += 1
+        draft = LayoutDraft(moving: item, to: section, at: index, in: items, generation: draftGeneration)
+        model.place(id, in: section, at: modelIndex(of: id, in: section, at: index, shown: neighbours))
+    }
+
+    /// The model counts `index` over its own items, which lag behind a draft: anchor on the neighbours shown.
+    private func modelIndex(of id: String, in section: MenuBarSection, at index: Int, shown neighbours: [AppModel.LayoutItem]) -> Int {
+        let known = model.layoutItems(in: section).map(\.id).filter { $0 != id }
+        if index < neighbours.count, let right = known.firstIndex(of: neighbours[index].id) { return right }
+        if index > 0, let left = known.firstIndex(of: neighbours[index - 1].id) { return left + 1 }
+        return index == 0 ? 0 : known.count
+    }
+
+    private func menuItems(for item: AppModel.LayoutItem, items: [AppModel.LayoutItem]) -> [BrandMenu.Item] {
+        var entries: [BrandMenu.Item] = []
+        if item.canHide {
+            let before = items.prefix { $0.id != item.id }
+            for section in MenuBarSection.allCases where section != item.section {
+                // Keep its place among the items already in that strip.
+                let index = before.count { $0.section == section }
+                entries.append(BrandMenu.Item("move to \(section.settingsLabel)", symbol: section.menuSymbol) {
+                    place(item.id, in: section, at: index, items: items)
+                })
+            }
+        }
+        let strip = items.filter { $0.section == item.section }
+        if item.canReorder, let position = strip.firstIndex(where: { $0.id == item.id }) {
+            if position > 0 {
+                entries.append(BrandMenu.Item("move to the start", symbol: "arrow.left.to.line") {
+                    place(item.id, in: item.section, at: 0, items: items)
+                })
+            }
+            if position < strip.count - 1 {
+                entries.append(BrandMenu.Item("move to the end", symbol: "arrow.right.to.line") {
+                    place(item.id, in: item.section, at: strip.count - 1, items: items)
+                })
+            }
+        }
+        return entries
+    }
 }
 
-// MARK: - Section bar
+// MARK: - Drag
 
-private struct SectionBar: View {
-    let section: MenuBarSection
-    let groups: [AppModel.AppGroup]
-    let onDrop: (String) -> Void
-    let onMove: (String, MenuBarSection) -> Void
+/// The item being dragged. A reference, so drop delegates see a drag the moment it starts,
+/// before SwiftUI renders again.
+@MainActor
+@Observable
+final class LayoutDragSession {
+    var itemID: String?
+}
 
-    @State private var isTargeted = false
-    @State private var viewportWidth: CGFloat = 0
+// MARK: - Draft
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(section.settingsLabel)
-                    .font(.brandBody)
-                    .foregroundStyle(BrandColors.on)
-                Text(subtitle)
-                    .font(.brandCaption)
-                    .foregroundStyle(BrandColors.onSecondary)
-                Spacer(minLength: 0)
-                Text("\(groups.count)")
-                    .font(.brandBadge)
-                    .foregroundStyle(BrandColors.onTertiary)
-                    .monospacedDigit()
-            }
+/// An optimistic copy of the layout after a move: the new left-to-right order and section changes.
+private struct LayoutDraft {
+    let order: [String]
+    let sections: [String: MenuBarSection]
+    let generation: Int
+    let createdAt = ContinuousClock.now
 
-            strip
+    init(moving item: AppModel.LayoutItem, to section: MenuBarSection, at index: Int, in items: [AppModel.LayoutItem], generation: Int) {
+        var sections: [String: MenuBarSection] = [:]
+        for other in items where other.id == item.id || (item.sectionKey != nil && other.sectionKey == item.sectionKey) {
+            sections[other.id] = section
         }
+
+        var order = items.map(\.id)
+        let neighbours = items.filter { $0.section == section && $0.id != item.id }
+        if item.canReorder, !neighbours.isEmpty {
+            order.removeAll { $0 == item.id }
+            if index < neighbours.count, let right = order.firstIndex(of: neighbours[index].id) {
+                order.insert(item.id, at: right)
+            } else if let last = neighbours.last, let left = order.firstIndex(of: last.id) {
+                order.insert(item.id, at: left + 1)
+            }
+        }
+
+        self.order = order
+        self.sections = sections
+        self.generation = generation
     }
 
-    private var subtitle: String {
-        switch section {
-        case .visible: "always in the menu bar."
-        case .hidden: "shown when you click the chevron."
-        case .alwaysHidden: "shown when you ⌥-click the chevron."
-        }
+    func apply(to items: [AppModel.LayoutItem]) -> [AppModel.LayoutItem] {
+        let byID = Dictionary(items.map { ($0.id, $0) }) { first, _ in first }
+        let placed = Set(order)
+        let ordered = order.compactMap { byID[$0] } + items.filter { !placed.contains($0.id) }
+        return ordered.map { item in sections[item.id].map(item.moved(to:)) ?? item }
     }
+}
 
-    /// A menu bar strip: `surfaceElevated`, a one-pixel `separatorSolid` ring at radius 9. A drop
-    /// target turns the ring cyan and washes the fill.
-    private var strip: some View {
-        let shape = RoundedRectangle(cornerRadius: 9)
-        return ScrollView(.horizontal) {
-            HStack(spacing: 4) {
-                if groups.isEmpty {
-                    Text("drop items here")
-                        .font(.brandCaption)
-                        .foregroundStyle(BrandColors.onTertiary)
-                        .frame(maxWidth: .infinity)
-                } else {
-                    ForEach(groups) { group in
-                        AppGroupChip(group: group, onMove: onMove)
-                    }
-                }
-            }
-            .padding(.horizontal, 8)
-            .frame(minWidth: viewportWidth, minHeight: 44, alignment: .trailing)
-        }
-        .scrollIndicators(.never)
-        .defaultScrollAnchor(.trailing)
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { viewportWidth = $0 }
-        .frame(height: 44)
-        .background(isTargeted ? BrandColors.accentWash : .clear, in: shape)
-        .brandHairlineBorder(
-            cornerRadius: 9,
-            fill: BrandColors.surfaceElevated,
-            ring: isTargeted ? BrandColors.accent : BrandColors.separatorSolid
+private extension AppModel.LayoutItem {
+    func moved(to section: MenuBarSection) -> Self {
+        Self(
+            id: id,
+            name: name,
+            section: section,
+            sectionKey: sectionKey,
+            image: image,
+            appIcon: appIcon,
+            symbolName: symbolName,
+            canHide: canHide,
+            canReorder: canReorder
         )
-        .animation(.easeOut(duration: 0.14), value: isTargeted)
-        .dropDestination(for: AppGroupDrag.self) { items, _ in
-            let moved = items.filter { drag in
-                groups.allSatisfy { $0.bundleIdentifier != drag.bundleIdentifier }
-            }
-            for drag in moved {
-                onDrop(drag.bundleIdentifier)
-            }
-            return !items.isEmpty
-        } isTargeted: { isTargeted = $0 }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(section.settingsLabel) section")
-    }
-}
-
-// MARK: - Chip
-
-private struct AppGroupChip: View {
-    let group: AppModel.AppGroup
-    let onMove: (String, MenuBarSection) -> Void
-
-    private static let maxImageHeight: CGFloat = 18
-
-    @State private var isHovered = false
-
-    var body: some View {
-        content
-            .padding(.horizontal, 6)
-            .frame(height: 28)
-            .background(isHovered ? BrandColors.surfaceSelected : .clear, in: RoundedRectangle(cornerRadius: 6))
-            .contentShape(RoundedRectangle(cornerRadius: 6))
-            .onHover { isHovered = $0 }
-            .animation(.easeOut(duration: 0.12), value: isHovered)
-            .help(group.name)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(group.name)
-            .accessibilityActions {
-                ForEach(MenuBarSection.allCases.filter { $0 != group.section }, id: \.self) { section in
-                    Button("move to \(section.settingsLabel)") { onMove(group.bundleIdentifier, section) }
-                }
-            }
-            .draggable(AppGroupDrag(bundleIdentifier: group.bundleIdentifier)) {
-                content
-                    .padding(.horizontal, 6)
-                    .frame(height: 28)
-                    .brandHairlineBorder(cornerRadius: 7, fill: BrandColors.surfaceHigh)
-                    .environment(\.colorScheme, .dark)
-            }
-            .brandContextMenu {
-                MenuBarSection.allCases.filter { $0 != group.section }.map { section in
-                    BrandMenu.Item("move to \(section.settingsLabel)", symbol: section.symbolName) {
-                        onMove(group.bundleIdentifier, section)
-                    }
-                }
-            }
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        if group.itemImages.isEmpty {
-            if let icon = group.appIcon {
-                Image(nsImage: icon)
-                    .resizable()
-                    .interpolation(.high)
-                    .frame(width: 18, height: 18)
-            } else if group.isSystem, let item = SystemItem(key: group.bundleIdentifier) {
-                Image(systemName: item.symbolName)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(BrandColors.on)
-                    .frame(width: 18, height: 18)
-            } else {
-                Image(systemName: "app.dashed")
-                    .font(.system(size: 13, weight: .medium))
-                    .frame(width: 18, height: 18)
-                    .foregroundStyle(BrandColors.onSecondary)
-            }
-        } else {
-            HStack(spacing: 2) {
-                ForEach(group.itemImages.indices, id: \.self) { index in
-                    let image = group.itemImages[index]
-                    let size = Self.displaySize(of: image)
-                    Image(nsImage: image)
-                        .resizable()
-                        .interpolation(.high)
-                        .frame(width: size.width, height: size.height)
-                }
-            }
-        }
-    }
-
-    /// Natural size in points, scaled down to fit the menu bar height.
-    private static func displaySize(of image: NSImage) -> CGSize {
-        let size = image.size
-        guard size.width > 0, size.height > 0 else { return CGSize(width: maxImageHeight, height: maxImageHeight) }
-        guard size.height > maxImageHeight else { return size }
-        let scale = maxImageHeight / size.height
-        return CGSize(width: (size.width * scale).rounded(), height: maxImageHeight)
     }
 }
 
 private extension MenuBarSection {
-    var symbolName: String {
+    var menuSymbol: String {
         switch self {
         case .visible: "eye"
         case .hidden: "eye.slash"
-        case .alwaysHidden: "lock"
+        case .alwaysHidden: "eye.slash.circle"
         }
-    }
-}
-
-// MARK: - Drag payload
-
-extension UTType {
-    static let baaarAppGroup = UTType(exportedAs: "com.laaabs.baaar.app-group", conformingTo: .data)
-}
-
-/// What a dragged chip carries: just the owner (bundle or system item key) it stands for.
-struct AppGroupDrag: Codable, Transferable {
-    private static let stringPrefix = "baaar-app-group:"
-
-    struct InvalidPayload: Error {}
-
-    let bundleIdentifier: String
-
-    static var transferRepresentation: some TransferRepresentation {
-        CodableRepresentation(contentType: .baaarAppGroup)
-        // Fallback in case the undeclared custom type doesn't survive the pasteboard.
-        ProxyRepresentation(exporting: { stringPrefix + $0.bundleIdentifier }, importing: { (string: String) in
-            guard string.hasPrefix(stringPrefix) else { throw InvalidPayload() }
-            return AppGroupDrag(bundleIdentifier: String(string.dropFirst(stringPrefix.count)))
-        })
     }
 }

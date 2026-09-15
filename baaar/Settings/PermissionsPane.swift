@@ -24,11 +24,24 @@ struct PermissionsPane: View {
                         isGranted: model.hasScreenRecording,
                         grant: model.requestScreenRecording
                     )
+                    BrandHLine()
+                    PermissionRow(
+                        title: "menu bar layout",
+                        badge: "optional",
+                        message: "lets baaar reorder items by editing macos's layout file, without moving your cursor.",
+                        systemImage: "arrow.left.arrow.right",
+                        isGranted: model.hasLayoutAccess,
+                        grantTitle: "grant…"
+                    ) {
+                        model.requestLayoutAccess()
+                        // refreshPermissions doesn't cover the layout file; read it back.
+                        Task { await model.reload() }
+                    }
                 }
                 .brandCard()
             }
 
-            Text("macOS does not say when access changes, so this page checks every second while it is open.")
+            Text("macos does not say when access changes, so this page checks every second while it is open.")
                 .font(.brandCaption)
                 .foregroundStyle(BrandColors.onTertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -53,6 +66,7 @@ private struct PermissionRow: View {
     let message: String
     let systemImage: String
     let isGranted: Bool
+    var grantTitle = "grant"
     let grant: () -> Void
 
     var body: some View {
@@ -87,7 +101,7 @@ private struct PermissionRow: View {
                 .foregroundStyle(BrandColors.success)
                 .transition(.opacity)
             } else {
-                PillButton("grant", action: grant)
+                PillButton(grantTitle, action: grant)
                     .transition(.opacity)
             }
         }
