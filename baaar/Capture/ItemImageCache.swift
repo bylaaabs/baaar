@@ -12,7 +12,7 @@ final class ItemImageCache {
 
     init() {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        directory = caches.appending(path: "com.aaangelmartin.baaar/items-v3", directoryHint: .isDirectory)
+        directory = caches.appending(path: "com.aaangelmartin.baaar/items-v4", directoryHint: .isDirectory)
     }
 
     func image(for item: MenuBarItem) -> NSImage? {
@@ -22,11 +22,21 @@ final class ItemImageCache {
         return image
     }
 
+    /// Whether a menu bar is on screen to picture: in full-screen spaces it hides until the pointer reaches the top.
+    static func isMenuBarOnScreen() async -> Bool {
+        guard let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true) else { return false }
+        return content.windows.contains { $0.title == "Menubar" && $0.isOnScreen && $0.frame.minY >= 0 }
+    }
+
     /// Captures the given items. Only items that are on screen right now come out usable.
-    func capture(_ items: [MenuBarItem]) async {
-        guard Permissions.hasScreenRecording, !items.isEmpty else { return }
-        guard let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true) else { return }
-        for window in content.windows where window.title == "Menubar" && window.isOnScreen {
+    /// Returns false when there was no menu bar on screen to capture from.
+    @discardableResult
+    func capture(_ items: [MenuBarItem]) async -> Bool {
+        guard Permissions.hasScreenRecording, !items.isEmpty else { return false }
+        guard let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true) else { return false }
+        let bars = content.windows.filter { $0.title == "Menubar" && $0.isOnScreen && $0.frame.minY >= 0 }
+        guard !bars.isEmpty else { return false }
+        for window in bars {
             let inside = items.filter { item in
                 guard let frame = item.frame else { return false }
                 return window.frame.contains(CGPoint(x: frame.midX, y: frame.midY))
@@ -53,6 +63,7 @@ final class ItemImageCache {
                 store(NSImage(cgImage: glyph, size: size), cgImage: glyph, for: item.id)
             }
         }
+        return true
     }
 
     private func store(_ image: NSImage, cgImage: CGImage, for id: String) {

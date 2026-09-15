@@ -379,33 +379,27 @@ final class MenuBarController {
 
     // MARK: - Pictures
 
-    /// Captures the items drawn right now.
-    func captureVisibleItems() async {
-        guard Permissions.hasScreenRecording else { return }
-        let snapshot = await refreshSnapshot()
-        await images.capture(snapshot.items.filter { $0.isManageable && snapshot.isOnScreen($0, concealed: restriction.concealedKeys) })
-    }
-
-    /// Whether a hidden item has never been pictured and hasn't failed recently.
+    /// Whether an item in the Hidden or Always Hidden section has never been pictured and hasn't failed recently.
     func hasHiddenItemsWithoutImages() async -> Bool {
         guard Permissions.hasScreenRecording else { return false }
         return !missingImages(in: await refreshSnapshot()).isEmpty
     }
 
     private func missingImages(in snapshot: MenuBarSnapshot) -> [MenuBarItem] {
-        items(in: [.hidden, .alwaysHidden], from: snapshot).filter { item in
+        manageableItems(in: snapshot).filter { item in
             images.image(for: item) == nil && (captureFailures[item.id].map { Date().timeIntervalSince($0) > 3600 } ?? true)
         }
     }
 
-    /// Captures hidden items without touching the cursor: everything else is concealed
-    /// for a moment so the hidden ones get drawn, a few at a time.
+    /// Pictures items without touching the cursor, a few at a time, each batch alone in the menu bar:
+    /// every other item, Apple's included, is concealed and baaar's own items are blanked, so a stale
+    /// frame can only land on empty space or on another item of the same batch, which the overlap check rejects.
     func refreshImages(onlyMissing: Bool = false) async {
         guard Permissions.hasScreenRecording, Permissions.hasAccessibility else { return }
-        await captureVisibleItems()
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             runTemporary { [weak self] isCurrent in
                 await self?.performRefresh(onlyMissing: onlyMissing, isCurrent: isCurrent)
+                self?.controls.setBlank(false)
                 continuation.resume()
             }
         }
@@ -413,9 +407,16 @@ final class MenuBarController {
 
     private func performRefresh(onlyMissing: Bool, isCurrent: @MainActor () -> Bool) async {
         let snapshot = await refreshSnapshot()
-        let targets = onlyMissing ? missingImages(in: snapshot) : items(in: [.hidden, .alwaysHidden], from: snapshot)
+        let targets = onlyMissing ? missingImages(in: snapshot) : manageableItems(in: snapshot)
         guard !targets.isEmpty else { return }
-        let everything = Set(snapshot.items.filter(\.isManageable).compactMap(\.sectionKey))
+        // A hidden menu bar (full screen, auto-hide) can't be pictured; wait for it rather than record failures.
+        for _ in 0..<150 {
+            if await ItemImageCache.isMenuBarOnScreen() { break }
+            guard isCurrent() else { return }
+            try? await Task.sleep(for: .seconds(2))
+        }
+        let everything = Set(manageableItems(in: snapshot).compactMap(\.sectionKey)).union(SystemItem.allCases.map(\.key))
+        controls.setBlank(true)
 
         for batch in batches(of: targets) {
             guard isCurrent() else { return }
@@ -423,14 +424,29 @@ final class MenuBarController {
             temporarilyAllowed = shown
             temporarilyConcealed = everything.subtracting(shown)
             apply()
-            try? await Task.sleep(for: .milliseconds(650))
+            let drawn = await settledItems(batch.map(\.id), isCurrent: isCurrent)
             guard isCurrent() else { return }
-            let current = await ItemScanner.scan()
-            await images.capture(current.items.filter { shown.contains($0.sectionKey ?? "") && current.isOnScreen($0, concealed: restriction.concealedKeys) })
+            guard await images.capture(drawn) else { return }
             for item in batch where images.image(for: item) == nil {
                 captureFailures[item.id] = Date()
             }
         }
+    }
+
+    /// Waits until the given items are drawn and their frames hold still between two scans, for up to two seconds.
+    private func settledItems(_ ids: [String], isCurrent: @MainActor () -> Bool) async -> [MenuBarItem] {
+        var previous: [String: CGRect] = [:]
+        var settled: [MenuBarItem] = []
+        for _ in 0..<14 {
+            try? await Task.sleep(for: .milliseconds(150))
+            guard isCurrent() else { return [] }
+            let snapshot = await ItemScanner.scan()
+            let drawn = ids.compactMap(snapshot.item(id:)).filter { snapshot.isOnScreen($0, concealed: restriction.concealedKeys) }
+            settled = drawn.filter { previous[$0.id] != nil && previous[$0.id] == $0.frame }
+            if settled.count == ids.count { return settled }
+            previous = Dictionary(uniqueKeysWithValues: drawn.compactMap { item in item.frame.map { (item.id, $0) } })
+        }
+        return settled
     }
 
     /// Groups items into batches narrow enough to fit next to the notch.

@@ -47,12 +47,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task {
             await controller.refreshSnapshot()
             // Hide right away when every hidden item already has a picture; otherwise picture them first.
+            controller.setReveal(.none)
             if await controller.hasHiddenItemsWithoutImages() {
-                await controller.captureVisibleItems()
-                controller.setReveal(.none)
                 await controller.refreshImages(onlyMissing: true)
-            } else {
-                controller.setReveal(.none)
             }
             if !Settings.didOnboard {
                 Settings.didOnboard = true
@@ -75,7 +72,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Status item actions fire on mouse up; anything else (VoiceOver, a stale event) counts as a primary click.
     private static func isSecondaryClick(_ event: NSEvent?) -> Bool {
         guard let event else { return false }
-        return event.type == .rightMouseUp || (event.type == .leftMouseUp && event.modifierFlags.contains(.control))
+        return event.type == .rightMouseUp || event.type == .rightMouseDown
+            || (event.type == .leftMouseUp && (event.modifierFlags.contains(.control) || NSEvent.modifierFlags.contains(.control)))
     }
 
     private func appIconClicked(_ event: NSEvent?) {
@@ -84,6 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func chevronClicked(_ event: NSEvent?) {
+        Log.write("chevron click type=\(String(describing: event?.type.rawValue)) flags=\(String(describing: event?.modifierFlags.rawValue))")
         if Self.isSecondaryClick(event) {
             bar.close()
             showMenu(under: ControlItems.Identifier.chevron)
@@ -97,7 +96,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             controller.setReveal(.none)
             return
         }
-        let includeAlwaysHidden = event?.type == .leftMouseUp && event?.modifierFlags.contains(.option) == true
+        // MenuBarAgent forwards status item clicks, and the forwarded event may not carry modifiers; read the keyboard instead.
+        let includeAlwaysHidden = NSEvent.modifierFlags.contains(.option) || event?.modifierFlags.contains(.option) == true
         showHiddenItems(includeAlwaysHidden: includeAlwaysHidden)
     }
 
@@ -252,6 +252,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: .left)?.post(tap: .cghidEventTap)
                 }
                 if let saved { CGWarpMouseCursorPosition(saved) }
+            },
+            "optionclick": { app, _ in
+                guard let frame = AppDelegate.ownFrame(ControlItems.Identifier.chevron, in: app.controller.snapshot),
+                      let primaryHeight = NSScreen.screens.first?.frame.height else { return }
+                let point = CGPoint(x: frame.midX, y: primaryHeight - frame.midY)
+                for type in [CGEventType.leftMouseDown, .leftMouseUp] {
+                    let event = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: .left)
+                    event?.flags = .maskAlternate
+                    event?.post(tap: .cghidEventTap)
+                }
             },
             "escape": { _, _ in
                 for keyDown in [true, false] {

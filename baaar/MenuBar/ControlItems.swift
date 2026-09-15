@@ -48,6 +48,15 @@ final class ControlItems {
         chevronItem.button?.appearsDisabled = !hasHiddenItems && !isOpen
     }
 
+    /// Takes baaar's own items out of the menu bar drawing while hidden items are pictured:
+    /// macOS 27 stops updating their frames after the bar reflows, so they can't be told apart from a capture.
+    func setBlank(_ blank: Bool) {
+        for item in [appItem, chevronItem] {
+            item.length = blank ? 0 : NSStatusItem.variableLength
+            item.button?.isHidden = blank
+        }
+    }
+
     @objc private func appClicked() {
         onAppClick?(NSApp.currentEvent)
     }
