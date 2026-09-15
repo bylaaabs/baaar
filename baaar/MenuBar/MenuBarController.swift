@@ -191,21 +191,25 @@ final class MenuBarController {
 
     private func remember(_ snapshot: MenuBarSnapshot) {
         let current = Set(snapshot.items.map(\.id))
-        for item in snapshot.items where item.isManageable {
+        for item in snapshot.items where item.isPressable && !item.isOwn {
             lastSeen[item.id] = item
         }
         lastSeen = lastSeen.filter { id, item in
             guard !current.contains(id) else { return true }
-            // Keep items missing only because they're concealed, as long as their owner still runs.
-            guard let key = item.sectionKey, restriction.concealedKeys.contains(key) else { return false }
-            return NSRunningApplication(processIdentifier: item.pid) != nil
+            guard NSRunningApplication(processIdentifier: item.pid) != nil else { return false }
+            // Keep items missing only because they're concealed. Apple modules outside the nine
+            // system items vanish whenever any restriction is active.
+            if let key = item.sectionKey {
+                return restriction.concealedKeys.contains(key)
+            }
+            return !restriction.concealedKeys.isEmpty
         }
     }
 
     /// The scan's manageable items plus concealed ones it no longer reports, in menu bar order.
     private func manageableItems(in snapshot: MenuBarSnapshot) -> [MenuBarItem] {
         let present = Set(snapshot.items.map(\.id))
-        let missing = lastSeen.values.filter { !present.contains($0.id) }
+        let missing = lastSeen.values.filter { !present.contains($0.id) && $0.isManageable }
         return (snapshot.items.filter(\.isManageable) + missing).sorted { ($0.frame?.minX ?? 0) < ($1.frame?.minX ?? 0) }
     }
 
@@ -236,6 +240,131 @@ final class MenuBarController {
                 appIcon: first.appIcon,
                 isSystem: first.systemItem != nil
             )
+        }
+    }
+
+    // MARK: - Layout
+
+    /// One row of the layout editor: an item the menu bar shows, in its real order.
+    struct LayoutEntry {
+        /// The layout table's id (`status:<bundle>::<autosave>`, `module:<Name>`), or `ax:<item id>` without an entry.
+        let id: String
+        let weight: Double?
+        let item: MenuBarItem
+    }
+
+    /// Every item in the menu bar, left to right, matched to its layout table entry when baaar can read the table.
+    func layoutEntries() async -> [LayoutEntry] {
+        let snapshot = await refreshSnapshot()
+        let present = snapshot.items.filter(\.isPressable)
+        let presentIDs = Set(present.map(\.id))
+        let known = present + lastSeen.values.filter { !presentIDs.contains($0.id) }
+        let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+        let positions = MenuBarLayoutTable.positions() ?? [:]
+
+        var entries: [LayoutEntry] = []
+        var used = Set<String>()
+        var statusByBundle: [String: [(id: String, weight: Double)]] = [:]
+        for (id, weight) in positions {
+            if id.hasPrefix("status:"), let separator = id.range(of: "::") {
+                let bundle = String(id[id.index(id.startIndex, offsetBy: 7)..<separator.lowerBound])
+                // Entries of apps that aren't running (or of old installs) stay in the table; skip them.
+                if running.contains(bundle) {
+                    statusByBundle[bundle, default: []].append((id, weight))
+                }
+            } else if id.hasPrefix("module:") {
+                let name = String(id.dropFirst(7))
+                if let item = known.first(where: { !used.contains($0.id) && $0.bundleIdentifier == MenuBarItem.menuBarAgent && Self.module(name, matches: $0.identifier) }) {
+                    used.insert(item.id)
+                    entries.append(LayoutEntry(id: id, weight: weight, item: item))
+                }
+            }
+        }
+        for (bundle, tableEntries) in statusByBundle {
+            let items = known.filter { $0.bundleIdentifier == bundle && !used.contains($0.id) }
+            if bundle == Bundle.main.bundleIdentifier {
+                // baaar's own items are named by autosave name.
+                for entry in tableEntries {
+                    let identifier = entry.id.hasSuffix("::baaarDivider") ? ControlItems.Identifier.chevron : entry.id.hasSuffix("::baaarToggle") ? ControlItems.Identifier.app : nil
+                    if let item = items.first(where: { $0.identifier == identifier }) {
+                        used.insert(item.id)
+                        entries.append(LayoutEntry(id: entry.id, weight: entry.weight, item: item))
+                    }
+                }
+                continue
+            }
+            // An app's entries and its items line up left to right.
+            let sortedEntries = tableEntries.sorted { $0.weight > $1.weight }
+            let sortedItems = items.sorted { ($0.frame?.minX ?? 0) < ($1.frame?.minX ?? 0) }
+            for (entry, item) in zip(sortedEntries, sortedItems) {
+                used.insert(item.id)
+                entries.append(LayoutEntry(id: entry.id, weight: entry.weight, item: item))
+            }
+        }
+        // Items the table doesn't list (or all of them, without access) fall back to their frames.
+        for item in known where !used.contains(item.id) && (item.isManageable || item.isOwn || item.bundleIdentifier == MenuBarItem.menuBarAgent) {
+            entries.append(LayoutEntry(id: "ax:\(item.id)", weight: nil, item: item))
+        }
+        return entries.sorted { lhs, rhs in
+            switch (lhs.weight, rhs.weight) {
+            case let (l?, r?) where l != r: l > r
+            default: (lhs.item.frame?.minX ?? 0) < (rhs.item.frame?.minX ?? 0)
+            }
+        }
+    }
+
+    /// Whether a layout table module name (`Clock`, `BentoBox-0`) names this MenuBarAgent item (`com.apple.menuextra.clock`).
+    private static func module(_ name: String, matches identifier: String?) -> Bool {
+        guard let identifier = identifier?.lowercased() else { return false }
+        let base = name.split(separator: "-").first.map { String($0).lowercased() } ?? name.lowercased()
+        let aliases: [String: [String]] = [
+            "bentobox": ["controlcenter"],
+            "userswitcher": ["user"],
+            "focusmodes": ["focusmode", "focus"],
+            "wifi": ["wifi"],
+            "sound": ["sound", "volume"],
+            "audiovideomodule": ["audiovideo", "avmodule", "privacy"],
+            "keyboardbrightness": ["keyboard"],
+            "display": ["display"],
+            "screenmirroring": ["screenmirroring", "airplay"],
+            "nowplaying": ["nowplaying"],
+        ]
+        let candidates = aliases[base] ?? [base]
+        return candidates.contains { identifier.hasSuffix(".\($0)") || identifier.hasSuffix($0) }
+    }
+
+    /// Moves an item to a position in a section: the section applies to its whole app, the order is
+    /// written to the layout table so MenuBarAgent re-sorts the bar.
+    ///
+    /// - Parameter neighbours: the ids of the section's items left to right, without the moved item.
+    func place(_ entryID: String, sectionKey: String?, in section: MenuBarSection, at index: Int, neighbours: [String]) {
+        if let sectionKey, Settings.section(forBundle: sectionKey) != section {
+            setSection(section, forBundle: sectionKey)
+        }
+        guard entryID.hasPrefix("status:") || entryID.hasPrefix("module:"), var positions = MenuBarLayoutTable.positions() else { return }
+        func weight(_ id: String) -> Double? {
+            positions[id]
+        }
+        let left = index > 0 ? neighbours[index - 1] : nil
+        let right = index < neighbours.count ? neighbours[index] : nil
+        var target: Double?
+        switch (left.flatMap(weight), right.flatMap(weight)) {
+        case let (l?, r?) where l - r > 1: target = (l + r) / 2
+        case let (l?, r?):
+            // No room between them: spread the whole table out, keeping its order, then take the gap.
+            let ordered = positions.sorted { $0.value > $1.value }
+            for (offset, entry) in ordered.enumerated() {
+                positions[entry.key] = Double((ordered.count - offset) * 32)
+            }
+            MenuBarLayoutTable.setPositions(positions)
+            let l2 = positions[left ?? ""] ?? l, r2 = positions[right ?? ""] ?? r
+            target = (l2 + r2) / 2
+        case let (l?, nil): target = l - 16
+        case let (nil, r?): target = r + 16
+        default: target = nil
+        }
+        if let target {
+            MenuBarLayoutTable.setPositions([entryID: target])
         }
     }
 

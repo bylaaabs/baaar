@@ -265,6 +265,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             "layoutaccess": { _, _ in
                 Log.write("layout table access: \(MenuBarLayoutTable.requestAccess())")
             },
+            "layoutentries": { app, _ in
+                await app.model.reload()
+                Log.write("layout entries\n" + app.model.layoutItems.map { "  \($0.section.rawValue)\t\($0.canHide ? "hide" : "fixed")\t\($0.canReorder ? "order" : "-")\t\($0.name)\t\($0.id)" }.joined(separator: "\n"))
+            },
             "layoutread": { _, _ in
                 let positions = MenuBarLayoutTable.positions()
                 Log.write("layout table readable=\(positions != nil)\n" + (positions ?? [:]).sorted { $0.value > $1.value }.map { "  \($0.value)  \($0.key)" }.joined(separator: "\n"))
