@@ -156,10 +156,10 @@ and with Screen Recording both granted and denied when the change touches pictur
 
   | Command | Argument | Does |
   |---|---|---|
-  | `reveal` | `all`, `hidden`, anything else hides | reveals sections in place |
+  | `reveal` | `all`, `hidden`, `alwaysHidden`, anything else hides | reveals sections in place |
   | `chevron` | | clicks the chevron |
   | `showall` | | shows hidden and always hidden items |
-  | `panel` | `all` to include always hidden | opens the bar, list or grid |
+  | `panel` | `alwaysHidden` for only the always hidden items | opens the bar, list or grid |
   | `close` | | closes the panel |
   | `menu` | `app` or `chevron` | opens the menu under that item |
   | `mode` | `menuBar`, `bar`, `list`, `grid` | changes the display mode |
