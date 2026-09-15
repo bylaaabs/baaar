@@ -72,7 +72,10 @@ ditto --norsrc "$ARCHIVED_APP" "$APP"
 step "Verifying the signature"
 codesign --verify --deep --strict --verbose=2 "$APP"
 codesign --display --verbose=2 "$APP" 2>&1 | grep -E "^(Authority=|Identifier=|TeamIdentifier=|Timestamp=|Runtime Version=|flags=)" | sed 's/^/    /'
-if ! codesign --display --verbose=2 "$APP" 2>&1 | grep -q "flags=.*runtime"; then
+# Captured rather than piped into grep -q: with pipefail, grep closing the pipe early
+# kills codesign with SIGPIPE and the whole pipeline reads as a failure.
+SIGNATURE="$(codesign --display --verbose=4 "$APP" 2>&1)"
+if [[ "$SIGNATURE" != *"flags="*"runtime"* ]]; then
   die "hardened runtime is not enabled on $APP"
 fi
 
