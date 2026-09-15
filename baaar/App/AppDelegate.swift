@@ -7,8 +7,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let images = ItemImageCache()
     private var isBusy = false
 
-    /// Time for the menu bar to finish animating items back in before capturing them.
-    private let revealSettleDelay = Duration.milliseconds(900)
+    /// Time for the menu bar to finish animating items in or out before reading them.
+    private let settleDelay = Duration.milliseconds(900)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         controls = ControlItems()
@@ -38,9 +38,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Settings.didOnboard = true
             showHowTo()
         } else if Settings.hidden {
-            // Items start out visible: let apps publish theirs, picture them, then hide.
+            // Items start out visible: let apps publish theirs, picture what's missing, then hide.
             Task {
                 try? await Task.sleep(for: .seconds(1.5))
+                await captureItems(includingOverflow: await hasItemsWithoutImages())
                 await hideSection()
             }
         }
@@ -92,37 +93,80 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         defer { isBusy = false }
         controls.setVisibility(.shown)
         Settings.hidden = false
-        try? await Task.sleep(for: revealSettleDelay)
+        try? await Task.sleep(for: settleDelay)
         await recordVisibleLayout()
     }
 
-    /// Shows the hidden section just long enough to picture its items again.
+    /// Shows the hidden section, and macOS's own overflow, just long enough to picture every item.
     private func refreshImages() async {
-        guard controls.visibility == .hidden, !isBusy else {
-            await recordVisibleLayout()
-            return
-        }
+        guard !isBusy else { return }
+        let wasHidden = controls.visibility == .hidden
         isBusy = true
-        controls.setVisibility(.shown)
-        try? await Task.sleep(for: revealSettleDelay)
-        await recordVisibleLayout()
-        controls.setVisibility(.hidden)
+        if wasHidden {
+            controls.setVisibility(.shown)
+            try? await Task.sleep(for: settleDelay)
+        }
+        await captureItems(includingOverflow: true)
+        if wasHidden {
+            controls.setVisibility(.hidden)
+        }
         isBusy = false
     }
 
+    /// Captures the items on screen and, when asked, the ones in macOS's overflow.
+    ///
+    /// On a notched display items that don't fit sit behind the native `«` chevron
+    /// and are never drawn. Expanding it lays them out left of the notch for a moment.
+    private func captureItems(includingOverflow: Bool) async {
+        guard let snapshot = await recordVisibleLayout() else { return }
+        guard includingOverflow, let chevron = snapshot.overflowButtonFrame else { return }
+        let collapsed = Set(snapshot.items.filter { isCandidate($0) && !isLaidOut($0, in: snapshot) }.map(\.id))
+        guard !collapsed.isEmpty else { return }
+
+        SyntheticClick.click(at: CGPoint(x: chevron.midX, y: chevron.midY))
+        try? await Task.sleep(for: settleDelay)
+        let expanded = await ItemScanner.scan()
+        await images.capture(expanded.items.filter { collapsed.contains($0.id) && isLaidOut($0, in: expanded) })
+        if let collapse = expanded.overflowButtonFrame {
+            SyntheticClick.click(at: CGPoint(x: collapse.midX, y: collapse.midY))
+            try? await Task.sleep(for: settleDelay)
+        }
+    }
+
     /// While items are on screen: remember where the divider is and capture every visible item.
-    private func recordVisibleLayout() async {
-        guard Permissions.hasAccessibility else { return }
+    @discardableResult
+    private func recordVisibleLayout() async -> MenuBarSnapshot? {
+        guard Permissions.hasAccessibility else { return nil }
         let snapshot = await ItemScanner.scan()
-        if let divider = ownDivider(in: snapshot), let frame = divider.frame {
+        if let frame = ownDivider(in: snapshot)?.frame {
             Settings.dividerMinX = frame.minX
         }
-        let overflowEdge = snapshot.overflowButtonFrame?.maxX ?? -.infinity
-        let visible = snapshot.items.filter { item in
-            guard item.isPressable, !item.isOwn, let frame = item.frame else { return false }
-            return frame.minX >= overflowEdge
+        await images.capture(snapshot.items.filter { isCandidate($0) && isLaidOut($0, in: snapshot) })
+        return snapshot
+    }
+
+    private func isCandidate(_ item: MenuBarItem) -> Bool {
+        item.isPressable && !item.isOwn
+    }
+
+    /// Whether the item is actually drawn where AX says.
+    ///
+    /// Items collapsed into macOS's overflow keep stale frames that pile up on
+    /// top of the chevron and of each other; capturing there would picture the chevron.
+    private func isLaidOut(_ item: MenuBarItem, in snapshot: MenuBarSnapshot) -> Bool {
+        // Neighbouring items legitimately overlap by a couple of points.
+        let slack: CGFloat = 5
+        guard let frame = item.frame?.insetBy(dx: slack, dy: 1) else { return false }
+        if let chevron = snapshot.overflowButtonFrame, frame.intersects(chevron) { return false }
+        return !snapshot.items.contains { other in
+            guard other.id != item.id, other.isPressable, let otherFrame = other.frame else { return false }
+            return frame.intersects(otherFrame.insetBy(dx: slack, dy: 1))
         }
-        await images.capture(visible)
+    }
+
+    private func hasItemsWithoutImages() async -> Bool {
+        guard Permissions.hasScreenRecording else { return false }
+        return await ItemScanner.scan().items.contains { $0.isPressable && !$0.isOwn && images.image(for: $0) == nil }
     }
 
     /// The toggle is the own item labelled "baaar"; the divider is the other one.
@@ -130,11 +174,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         snapshot.ownItems.first { $0.label != "baaar" }
     }
 
+    /// The baaar icon's frame in AppKit screen coordinates, read from AX because
+    /// macOS 27 stops updating status item window frames after a ⌘-drag.
+    private func toggleFrame() async -> CGRect? {
+        let own = await ItemScanner.scan(onlyOwn: true)
+        guard let frame = own.ownItems.first(where: { $0.label == "baaar" })?.frame,
+              let primaryHeight = NSScreen.screens.first?.frame.height else {
+            return controls.toggle.button?.window?.frame
+        }
+        return CGRect(x: frame.minX, y: primaryHeight - frame.maxY, width: frame.width, height: frame.height)
+    }
+
     // MARK: - Bar
 
     private func openBar() async {
+        let anchor = await toggleFrame()
         guard Permissions.hasAccessibility else {
-            presentBar(entries: [], message: "baaar needs Accessibility access — right-click the icon")
+            presentBar(entries: [], message: "baaar needs Accessibility access — right-click its icon", anchor: anchor)
             return
         }
         let snapshot = await ItemScanner.scan()
@@ -144,14 +200,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return (item.frame?.midX ?? -.infinity) < dividerX
         }
         let entries = hidden.map { BarEntry(item: $0, image: images.image(for: $0)) }
-        presentBar(entries: entries, message: entries.isEmpty ? "Nothing hidden — ⌘-drag icons to the left of ‹" : nil)
+        presentBar(entries: entries, message: entries.isEmpty ? "Nothing hidden — ⌘-drag icons to the left of ‹" : nil, anchor: anchor)
     }
 
-    private func presentBar(entries: [BarEntry], message: String?) {
+    private func presentBar(entries: [BarEntry], message: String?, anchor: CGRect?) {
         bar.show(
             entries: entries,
             message: message,
-            anchor: controls.toggle.button?.window?.frame,
+            layout: Settings.barLayout,
+            anchor: anchor,
             screen: controls.toggleScreen,
             appearance: controls.toggle.button?.effectiveAppearance
         )
@@ -160,14 +217,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func press(_ item: MenuBarItem) {
         bar.close()
         // macOS 27 opens a hidden item's menu at its last on-screen spot without revealing it.
-        let element = item.element
-        Task {
-            try? await Task.sleep(for: .milliseconds(60))
-            let result = AX.perform(kAXPressAction, on: element.raw)
-            if result != .success {
-                await showSection()
-            }
-        }
+        AX.pressInBackground(item.element, id: item.id)
     }
 
     // MARK: - Menu
@@ -176,27 +226,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         bar.close()
         let menu = NSMenu()
         let sectionTitle = controls.visibility == .shown ? "Hide Items" : "Show Hidden Items in Menu Bar"
-        addItem(to: menu, sectionTitle, #selector(menuToggleSection), key: "")
-        addItem(to: menu, "Refresh Icons", #selector(menuRefreshImages), key: "")
+        addItem(to: menu, sectionTitle, #selector(menuToggleSection))
+        addItem(to: menu, "Refresh Icons", #selector(menuRefreshImages))
         menu.addItem(.separator())
-        addItem(to: menu, "How to Hide Icons…", #selector(showHowTo), key: "")
-        addItem(to: menu, "Launch at Login", #selector(menuToggleLaunchAtLogin), key: "").state = Settings.launchesAtLogin ? .on : .off
+
+        let layoutMenu = NSMenu()
+        for (layout, title) in [(Settings.BarLayout.horizontal, "Horizontal Bar"), (.vertical, "Vertical List")] {
+            let item = addItem(to: layoutMenu, title, #selector(menuSelectLayout(_:)))
+            item.representedObject = layout.rawValue
+            item.state = Settings.barLayout == layout ? .on : .off
+        }
+        menu.addItem(withTitle: "Bar Layout", action: nil, keyEquivalent: "").submenu = layoutMenu
+        addItem(to: menu, "Launch at Login", #selector(menuToggleLaunchAtLogin)).state = Settings.launchesAtLogin ? .on : .off
+        addItem(to: menu, "How to Hide Icons…", #selector(showHowTo))
         if !Permissions.hasAccessibility {
-            addItem(to: menu, "Grant Accessibility Access…", #selector(menuOpenAccessibility), key: "")
+            addItem(to: menu, "Grant Accessibility Access…", #selector(menuOpenAccessibility))
         }
         if !Permissions.hasScreenRecording {
-            addItem(to: menu, "Show Real Icons (Screen Recording)…", #selector(menuRequestScreenRecording), key: "")
+            addItem(to: menu, "Show Real Icons (Screen Recording)…", #selector(menuRequestScreenRecording))
         }
-        addItem(to: menu, "Write Diagnostics", #selector(menuDiagnostics), key: "")
+        addItem(to: menu, "Write Diagnostics", #selector(menuDiagnostics))
         menu.addItem(.separator())
         addItem(to: menu, "Quit baaar", #selector(NSApplication.terminate(_:)), key: "q").target = NSApp
 
-        guard let button = controls.toggle.button else { return }
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.maxY + 6), in: button)
+        Task {
+            guard let anchor = await toggleFrame() else { return }
+            let menuBarBottom = controls.toggleScreen?.visibleFrame.maxY ?? anchor.minY
+            // With no view the location is in screen coordinates and marks the menu's top-left corner.
+            // It must sit below the menu bar, or AppKit clips the menu and adds a scroll arrow.
+            let origin = NSPoint(x: anchor.midX - menu.size.width / 2, y: min(anchor.minY, menuBarBottom) - 2)
+            menu.popUp(positioning: nil, at: origin, in: nil)
+        }
     }
 
     @discardableResult
-    private func addItem(to menu: NSMenu, _ title: String, _ action: Selector, key: String) -> NSMenuItem {
+    private func addItem(to menu: NSMenu, _ title: String, _ action: Selector, key: String = "") -> NSMenuItem {
         let item = menu.addItem(withTitle: title, action: action, keyEquivalent: key)
         item.target = self
         return item
@@ -208,6 +272,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func menuRefreshImages() {
         Task { await refreshImages() }
+    }
+
+    @objc private func menuSelectLayout(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let layout = Settings.BarLayout(rawValue: raw) else { return }
+        Settings.barLayout = layout
     }
 
     @objc private func menuToggleLaunchAtLogin() {
@@ -231,27 +300,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    #if DEBUG
-    /// Lets scripts drive the app: `notifyutil` can't carry a payload, so the command is the name suffix.
-    private func listenForDebugCommands() {
-        let commands: [String: @MainActor @Sendable (AppDelegate) async -> Void] = [
-            "hide": { await $0.hideSection() },
-            "show": { await $0.showSection() },
-            "refresh": { await $0.refreshImages() },
-            "bar": { await $0.openBar() },
-            "close": { $0.bar.close() },
-        ]
-        for (name, command) in commands {
-            DistributedNotificationCenter.default().addObserver(forName: .init("com.aaangelmartin.baaar.debug.\(name)"), object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    Task { await command(self) }
-                }
-            }
-        }
-    }
-    #endif
-
     @objc private func showHowTo() {
         let alert = NSAlert()
         alert.messageText = "Hide icons with baaar"
@@ -265,4 +313,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate()
         alert.runModal()
     }
+
+    // MARK: - Debug
+
+    #if DEBUG
+    /// Lets scripts drive the app through distributed notifications named `com.aaangelmartin.baaar.debug.<command>`.
+    /// `press` takes the item's bundle identifier as the notification object.
+    private func listenForDebugCommands() {
+        let center = DistributedNotificationCenter.default()
+        let commands: [String: @MainActor (AppDelegate, String?) async -> Void] = [
+            "hide": { app, _ in await app.hideSection() },
+            "show": { app, _ in await app.showSection() },
+            "refresh": { app, _ in await app.refreshImages() },
+            "bar": { app, _ in await app.openBar() },
+            "close": { app, _ in app.bar.close() },
+            "menu": { app, _ in app.showMenu() },
+            "layout": { _, argument in Settings.barLayout = Settings.BarLayout(rawValue: argument ?? "") ?? .horizontal },
+            "press": { app, bundleID in
+                let item = await ItemScanner.scan().items.first { $0.bundleIdentifier == bundleID && $0.isPressable }
+                if let item { app.press(item) }
+            },
+        ]
+        for (name, command) in commands {
+            center.addObserver(forName: .init("com.aaangelmartin.baaar.debug.\(name)"), object: nil, queue: .main) { [weak self] note in
+                let argument = note.object as? String
+                Task { @MainActor in
+                    guard let self else { return }
+                    await command(self, argument)
+                }
+            }
+        }
+    }
+    #endif
 }

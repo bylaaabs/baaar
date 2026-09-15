@@ -5,10 +5,23 @@ import ServiceManagement
 enum Settings {
     private static let defaults = UserDefaults.standard
 
+    enum BarLayout: String, CaseIterable {
+        /// A row of icons under the baaar icon, like the Ice Bar.
+        case horizontal
+        /// A list with each icon and its app name.
+        case vertical
+    }
+
     private enum Key {
         static let hidden = "hidden"
         static let dividerMinX = "dividerMinX"
         static let didOnboard = "didOnboard"
+        static let barLayout = "barLayout"
+    }
+
+    static var barLayout: BarLayout {
+        get { defaults.string(forKey: Key.barLayout).flatMap(BarLayout.init(rawValue:)) ?? .horizontal }
+        set { defaults.set(newValue.rawValue, forKey: Key.barLayout) }
     }
 
     /// Whether the hidden section was hidden when baaar last ran.

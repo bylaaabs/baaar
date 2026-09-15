@@ -9,11 +9,14 @@ enum ItemScanner {
     private static let queue = DispatchQueue(label: "com.aaangelmartin.baaar.scanner", qos: .userInitiated)
 
     /// Scans off the main thread; a slow app only costs its own messaging timeout.
-    static func scan() async -> MenuBarSnapshot {
+    ///
+    /// The main thread must never query baaar's own items: AX requests to our own
+    /// process are answered on the main thread, so it would wait on itself.
+    static func scan(onlyOwn: Bool = false) async -> MenuBarSnapshot {
         let ownPID = ProcessInfo.processInfo.processIdentifier
-        let apps = NSWorkspace.shared.runningApplications.map {
-            AppRef(pid: $0.processIdentifier, bundleIdentifier: $0.bundleIdentifier, name: $0.localizedName ?? $0.bundleIdentifier ?? "App")
-        }
+        let apps = NSWorkspace.shared.runningApplications
+            .filter { !onlyOwn || $0.processIdentifier == ownPID }
+            .map { AppRef(pid: $0.processIdentifier, bundleIdentifier: $0.bundleIdentifier, name: $0.localizedName ?? $0.bundleIdentifier ?? "App") }
         return await withCheckedContinuation { continuation in
             queue.async {
                 var snapshot = MenuBarSnapshot(items: [], overflowButtonFrame: nil)
@@ -44,12 +47,9 @@ enum ItemScanner {
                 snapshot.overflowButtonFrame = AX.frame(child)
                 continue
             }
-            let label = [kAXTitleAttribute, kAXDescriptionAttribute, kAXHelpAttribute, kAXIdentifierAttribute]
-                .lazy
-                .compactMap { (AX.value(child, $0) as String?)?.nilIfEmpty }
-                .first
-                .map { $0.components(separatedBy: .newlines)[0] }
-            let base = "\(app.bundleIdentifier ?? app.name)/\(label ?? "item")"
+            let label = firstString(of: child, [kAXTitleAttribute, kAXDescriptionAttribute])
+            let key = label ?? firstString(of: child, [kAXHelpAttribute, kAXIdentifierAttribute])
+            let base = "\(app.bundleIdentifier ?? app.name)/\(key ?? "item")"
             let occurrence = occurrences[base, default: 0]
             occurrences[base] = occurrence + 1
             snapshot.items.append(MenuBarItem(
@@ -65,6 +65,13 @@ enum ItemScanner {
             ))
         }
     }
+}
+
+private func firstString(of element: AXUIElement, _ attributes: [String]) -> String? {
+    attributes.lazy
+        .compactMap { (AX.value(element, $0) as String?)?.nilIfEmpty }
+        .first
+        .map { $0.components(separatedBy: .newlines)[0] }
 }
 
 enum AX {
@@ -96,6 +103,21 @@ enum AX {
     @discardableResult
     static func perform(_ action: String, on element: AXUIElement) -> AXError {
         AXUIElementPerformAction(element, action as CFString)
+    }
+
+    /// Presses an item without blocking the caller.
+    ///
+    /// `AXPress` only returns once the target app handles it, and for a status
+    /// item that is when its menu closes, so a timeout (`cannotComplete`) is the
+    /// normal outcome while the menu is still open.
+    static func pressInBackground(_ element: AXElement, id: String) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            AXUIElementSetMessagingTimeout(element.raw, 1)
+            let result = AXUIElementPerformAction(element.raw, kAXPressAction as CFString)
+            if result != .success, result != .cannotComplete {
+                Log.write("press \(id) failed with AXError \(result.rawValue)")
+            }
+        }
     }
 
     private static func axValue(_ element: AXUIElement, _ attribute: String) -> AXValue? {

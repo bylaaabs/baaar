@@ -17,7 +17,7 @@ struct MenuBarItem: Sendable, Identifiable, Hashable {
     let pid: pid_t
     let bundleIdentifier: String?
     let appName: String
-    /// Title, description or help text, whichever the item exposes first.
+    /// The item's title or description, if it has one.
     let label: String?
     /// Frame in global screen coordinates with a top-left origin, as AX reports it.
     ///
@@ -28,7 +28,9 @@ struct MenuBarItem: Sendable, Identifiable, Hashable {
     let isOwn: Bool
 
     var displayName: String {
-        guard let label, !label.isEmpty, label != appName else { return appName }
+        guard let label, label != appName else { return appName }
+        // Apple's extras run in helper processes with names like "WeatherMenu"; their label reads better.
+        if bundleIdentifier?.hasPrefix("com.apple.") == true { return label }
         return "\(appName) — \(label)"
     }
 
