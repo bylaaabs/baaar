@@ -21,7 +21,7 @@ struct GeneralPane: View {
             }
 
             BrandBlock("bar color") {
-                BrandRow("color", detail: "the bar, list and grid use one of the laaabs. colors. on cyan and white, icons are drawn in black.") {
+                BrandRow("color", detail: "the bar, list and grid use one of the laaabs. colors, or macos glass. on cyan and white, icons are drawn in black.") {
                     HStack(spacing: 10) {
                         ForEach(BarColor.allCases, id: \.self) { color in
                             BarColorSwatch(color: color, isSelected: model.barColor == color) {
@@ -216,6 +216,7 @@ private struct BarColorSwatch: View {
         case .graphite: BrandColors.surfaceHigh
         case .cyan: BrandColors.accent
         case .white: .white
+        case .glass: BrandColors.surfaceHigh
         }
     }
 
@@ -223,6 +224,12 @@ private struct BarColorSwatch: View {
         Button(action: action) {
             Circle()
                 .fill(fill)
+                .overlay {
+                    if color == .glass {
+                        // A glass swatch: a soft highlight over the dark disc.
+                        Circle().fill(LinearGradient(colors: [BrandColors.on.opacity(0.35), .clear], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    }
+                }
                 .overlay(Circle().strokeBorder(BrandColors.borderSolid, lineWidth: 1))
                 .frame(width: 22, height: 22)
                 .padding(3)

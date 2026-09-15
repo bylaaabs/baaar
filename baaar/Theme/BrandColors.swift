@@ -110,6 +110,11 @@ struct BarPalette {
             background = NSColor.white
             ring = NSColor.black.withAlphaComponent(0.12)
             foreground = BrandColors.nsSurface
+        case .glass:
+            // The glass draws itself; these only colour the content on top of it.
+            background = .clear
+            ring = .clear
+            foreground = BrandColors.nsOn
         }
         secondary = foreground.withAlphaComponent(0.55)
         hover = foreground.withAlphaComponent(0.08)

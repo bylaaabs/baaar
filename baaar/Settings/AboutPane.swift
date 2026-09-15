@@ -28,14 +28,7 @@ struct AboutPane: View {
 
             Spacer(minLength: 16)
 
-            BrandBadge(text: "credits", tint: BrandColors.onTertiary)
-            Text("set in outfit, by the outfit project authors, under the sil open font license.")
-                .font(.brandCaption)
-                .foregroundStyle(BrandColors.onSecondary)
-                .multilineTextAlignment(.center)
-
             BrandLink(title: "a tool by laaabs.", url: "https://laaabs.com", color: BrandColors.onTertiary)
-                .padding(.top, 6)
 
             PillButton("quit baaar", kind: .destructive) {
                 NSApp.terminate(nil)

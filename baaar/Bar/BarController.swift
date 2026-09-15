@@ -75,7 +75,7 @@ final class BarController {
 
         let panel = BarPanel(contentRect: frame)
         panel.appearance = NSAppearance(named: color == .white ? .aqua : .darkAqua)
-        panel.contentView = BarContainerView(content: content, palette: palette)
+        panel.contentView = BarContainerView(content: content, palette: palette, glass: color == .glass)
         panel.onCancel = { [weak self] in self?.close() }
         panel.alphaValue = 0
         panel.makeKeyAndOrderFront(nil)
@@ -186,9 +186,9 @@ private final class BarContainerView: NSView {
     /// stops at the 6 pt gap under the menu bar, so the panel never covers the chevron.
     static let shadowInsets = NSEdgeInsets(top: 6, left: 18, bottom: 22, right: 18)
 
-    init(content: NSView, palette: BarPalette) {
+    init(content: NSView, palette: BarPalette, glass: Bool) {
         super.init(frame: .zero)
-        let surface = BarSurfaceView(palette: palette)
+        let surface: NSView = glass ? BarGlassView() : BarSurfaceView(palette: palette)
         surface.translatesAutoresizingMaskIntoConstraints = false
         addSubview(surface)
         surface.addSubview(content)
@@ -217,6 +217,29 @@ private final class BarContainerView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) is not supported")
+    }
+}
+
+/// Liquid Glass at radius 9 with the overlay shadow; the system tints it from what's behind.
+private final class BarGlassView: NSGlassEffectView {
+    init() {
+        super.init(frame: .zero)
+        cornerRadius = 9
+        wantsLayer = true
+        layer?.shadowColor = NSColor.black.cgColor
+        layer?.shadowOpacity = 0.35
+        layer?.shadowRadius = 12
+        layer?.shadowOffset = CGSize(width: 0, height: -4)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is not supported")
+    }
+
+    override func layout() {
+        super.layout()
+        layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: 9, cornerHeight: 9, transform: nil)
     }
 }
 

@@ -138,6 +138,8 @@ enum BarColor: String, CaseIterable, Sendable {
     case graphite
     case cyan
     case white
+    /// macOS's Liquid Glass, blurring whatever is behind the bar.
+    case glass
 
     var title: String { rawValue }
 
