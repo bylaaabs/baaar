@@ -269,6 +269,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 await app.model.reload()
                 Log.write("layout entries\n" + app.model.layoutItems.map { "  \($0.section.rawValue)\t\($0.canHide ? "hide" : "fixed")\t\($0.canReorder ? "order" : "-")\t\($0.name)\t\($0.id)" }.joined(separator: "\n"))
             },
+            // "<entry id>|<section>|<index>"
+            "place": { app, argument in
+                let parts = (argument ?? "").split(separator: "|").map(String.init)
+                guard parts.count == 3, let section = MenuBarSection(rawValue: parts[1]), let index = Int(parts[2]) else { return }
+                await app.model.reload()
+                app.model.place(parts[0], in: section, at: index)
+            },
             "layoutread": { _, _ in
                 let positions = MenuBarLayoutTable.positions()
                 Log.write("layout table readable=\(positions != nil)\n" + (positions ?? [:]).sorted { $0.value > $1.value }.map { "  \($0.value)  \($0.key)" }.joined(separator: "\n"))
