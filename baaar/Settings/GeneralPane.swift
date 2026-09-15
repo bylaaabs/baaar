@@ -21,12 +21,17 @@ struct GeneralPane: View {
             }
 
             BrandBlock("bar color") {
-                BrandRow("color", detail: "the bar, list and grid use one of the laaabs. colors, or macos glass. on cyan and white, icons are drawn in black.") {
+                BrandRow("color", detail: "the bar, list and grid use one of the laaabs. colors, or macos glass. on white, icons are drawn in black.") {
                     HStack(spacing: 10) {
-                        ForEach(BarColor.allCases, id: \.self) { color in
+                        ForEach(BarColor.allCases.filter(\.isSolid), id: \.self) { color in
                             BarColorSwatch(color: color, isSelected: model.barColor == color) {
                                 model.barColor = color
                             }
+                        }
+                        BrandVLine(height: 20)
+                            .padding(.horizontal, 2)
+                        BarColorSwatch(color: .glass, isSelected: model.barColor == .glass) {
+                            model.barColor = .glass
                         }
                     }
                 }

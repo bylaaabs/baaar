@@ -105,7 +105,7 @@ struct BarPalette {
         case .cyan:
             background = BrandColors.nsAccent
             ring = BrandColors.nsAccentDeep
-            foreground = BrandColors.nsSurface
+            foreground = BrandColors.nsOn
         case .white:
             background = NSColor.white
             ring = NSColor.black.withAlphaComponent(0.12)

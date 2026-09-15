@@ -143,9 +143,14 @@ enum BarColor: String, CaseIterable, Sendable {
 
     var title: String { rawValue }
 
-    /// Light surfaces draw item pictures as one-colour glyphs, so captured white icons stay legible.
+    /// The white surface draws item pictures as one-colour glyphs, so captured white icons stay legible.
     var tintsIcons: Bool {
-        self == .cyan || self == .white
+        self == .white
+    }
+
+    /// Solid colors sit together in the picker; glass stands apart.
+    var isSolid: Bool {
+        self != .glass
     }
 }
 
