@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Owns the settings window. baaar is a menu bar app, so it becomes a regular app only while the window is open.
+/// Owns the settings window. baaar lives in the menu bar, so it becomes a regular process with a Dock icon only while the window is open.
 @MainActor
 final class SettingsWindowController: NSObject, NSWindowDelegate {
     private let model: AppModel
@@ -29,22 +29,24 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
 
     private func makeWindow() -> NSWindow {
+        let hosting = NSHostingController(rootView: SettingsView(model: model, reloader: reloader, navigation: navigation))
+        // Fill the whole window, under the transparent titlebar, so the view draws its own title
+        // row with the traffic lights floating on top instead of leaving a grey band.
+        hosting.safeAreaRegions = []
+
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 760, height: 520),
+            contentRect: NSRect(x: 0, y: 0, width: 760, height: 540),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        window.title = "baaar Settings"
-        window.toolbarStyle = .unified
+        window.contentViewController = hosting
+        window.title = "baaar settings"
+        window.applyBrandChrome(titleVisible: false, fullSizeContent: true)
         window.isReleasedWhenClosed = false
-        window.contentMinSize = NSSize(width: 640, height: 440)
+        window.contentMinSize = NSSize(width: 660, height: 460)
         window.delegate = self
-
-        let hostingView = NSHostingView(rootView: SettingsView(model: model, reloader: reloader, navigation: navigation))
-        hostingView.sceneBridgingOptions = [.toolbars]
-        window.contentView = hostingView
-        window.setContentSize(NSSize(width: 760, height: 520))
+        window.setContentSize(NSSize(width: 760, height: 540))
         window.center()
 
         self.window = window
@@ -62,7 +64,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     // MARK: - Main menu
 
-    /// A regular app with no main menu ignores ⌘W and ⌘Q, so give it the essentials while the window is open.
+    /// Without a main menu ⌘W and ⌘Q do nothing, so install the essentials while the window is open.
     private func installMainMenu() {
         guard previousMainMenu == nil else { return }
         previousMainMenu = .some(NSApp.mainMenu)
@@ -77,22 +79,22 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     private func makeMainMenu() -> NSMenu {
         let appMenu = NSMenu(title: "baaar")
-        appMenu.addItem(item("About baaar", #selector(showAbout(_:)), target: self))
+        appMenu.addItem(item("about baaar", #selector(showAbout(_:)), target: self))
         appMenu.addItem(.separator())
-        appMenu.addItem(item("Settings…", #selector(showSettings(_:)), key: ",", target: self))
+        appMenu.addItem(item("settings\u{2026}", #selector(showSettings(_:)), key: ",", target: self))
         appMenu.addItem(.separator())
-        appMenu.addItem(item("Hide baaar", #selector(NSApplication.hide(_:)), key: "h"))
+        appMenu.addItem(item("hide baaar", #selector(NSApplication.hide(_:)), key: "h"))
         appMenu.addItem(.separator())
-        appMenu.addItem(item("Quit baaar", #selector(NSApplication.terminate(_:)), key: "q"))
+        appMenu.addItem(item("quit baaar", #selector(NSApplication.terminate(_:)), key: "q"))
 
-        let fileMenu = NSMenu(title: "File")
-        fileMenu.addItem(item("Close", #selector(NSWindow.performClose(_:)), key: "w"))
+        let fileMenu = NSMenu(title: "file")
+        fileMenu.addItem(item("close", #selector(NSWindow.performClose(_:)), key: "w"))
 
-        let editMenu = NSMenu(title: "Edit")
-        editMenu.addItem(item("Cut", #selector(NSText.cut(_:)), key: "x"))
-        editMenu.addItem(item("Copy", #selector(NSText.copy(_:)), key: "c"))
-        editMenu.addItem(item("Paste", #selector(NSText.paste(_:)), key: "v"))
-        editMenu.addItem(item("Select All", #selector(NSText.selectAll(_:)), key: "a"))
+        let editMenu = NSMenu(title: "edit")
+        editMenu.addItem(item("cut", #selector(NSText.cut(_:)), key: "x"))
+        editMenu.addItem(item("copy", #selector(NSText.copy(_:)), key: "c"))
+        editMenu.addItem(item("paste", #selector(NSText.paste(_:)), key: "v"))
+        editMenu.addItem(item("select all", #selector(NSText.selectAll(_:)), key: "a"))
 
         let mainMenu = NSMenu(title: "Main Menu")
         for submenu in [appMenu, fileMenu, editMenu] {

@@ -8,44 +8,40 @@ struct LayoutPane: View {
     let reloader: ModelReloader
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                header
+        VStack(alignment: .leading, spacing: 24) {
+            header
 
-                if !model.canHideItems {
-                    Callout(
-                        systemImage: "exclamationmark.triangle.fill",
-                        tint: .orange,
-                        title: "Hiding isn't supported on this Mac",
-                        message: "This version of macOS doesn't let apps hide menu bar items, so every section stays visible."
-                    )
-                }
-
-                if !model.hasAccessibility {
-                    Callout(
-                        systemImage: "hand.raised.fill",
-                        tint: .accentColor,
-                        title: "Accessibility access needed",
-                        message: "baaar needs Accessibility access to list and open menu bar items.",
-                        actionTitle: "Grant Access…",
-                        action: model.requestAccessibility
-                    )
-                }
-
-                ForEach(MenuBarSection.allCases, id: \.self) { section in
-                    SectionBar(section: section, groups: model.groups(in: section)) { id in
-                        move(id, to: section)
-                    } onMove: { id, target in
-                        move(id, to: target)
-                    }
-                }
-
-                Text("baaar hides whole apps. Apple's items listed here can be hidden one by one; other Apple items (like Focus or Fast User Switching) disappear while anything is hidden.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            if !model.canHideItems {
+                BrandCallout(
+                    systemImage: "exclamationmark.triangle",
+                    tint: BrandColors.danger,
+                    title: "hiding is not available on this Mac",
+                    message: "this version of macOS does not let baaar hide menu bar items, so every section stays visible."
+                )
             }
-            .padding(20)
+
+            if !model.hasAccessibility {
+                BrandCallout(
+                    systemImage: "hand.raised",
+                    title: "accessibility access needed",
+                    message: "baaar needs accessibility access to list and open menu bar items.",
+                    actionTitle: "grant access",
+                    action: model.requestAccessibility
+                )
+            }
+
+            ForEach(MenuBarSection.allCases, id: \.self) { section in
+                SectionBar(section: section, groups: model.groups(in: section)) { id in
+                    move(id, to: section)
+                } onMove: { id, target in
+                    move(id, to: target)
+                }
+            }
+
+            Text("every icon one tool puts in the menu bar moves together. Apple's items listed here can be hidden one by one; other Apple items, like focus or fast user switching, disappear while anything is hidden.")
+                .font(.brandCaption)
+                .foregroundStyle(BrandColors.onTertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .task { reloader.reloadIfStale() }
     }
@@ -57,24 +53,28 @@ struct LayoutPane: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 16) {
+        HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Drag apps between sections")
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                Text("baaar hides whole apps: every icon an app puts in the menu bar moves together.")
-                    .foregroundStyle(.secondary)
+                Text("drag items between sections")
+                    .font(.brandHeadline)
+                    .foregroundStyle(BrandColors.on)
+                Text("right-click an item to move it without dragging.")
+                    .font(.brandCaption)
+                    .foregroundStyle(BrandColors.onSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
-            Button {
+            PillButton("refresh icons", kind: .secondary) {
                 Task { await model.refreshIcons() }
-            } label: {
-                HStack(spacing: 6) {
-                    if model.isRefreshing {
-                        ProgressView().controlSize(.mini)
-                    }
-                    Text("Refresh Icons")
+            } leading: {
+                if model.isRefreshing {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .tint(BrandColors.accent)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(BrandColors.onSecondary)
                 }
             }
             .disabled(model.isRefreshing)
@@ -90,18 +90,23 @@ private struct SectionBar: View {
     let onDrop: (String) -> Void
     let onMove: (String, MenuBarSection) -> Void
 
-    @Environment(\.colorScheme) private var colorScheme
     @State private var isTargeted = false
     @State private var viewportWidth: CGFloat = 0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(section.title)
-                    .font(.headline)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(section.settingsLabel)
+                    .font(.brandBody)
+                    .foregroundStyle(BrandColors.on)
                 Text(subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.brandCaption)
+                    .foregroundStyle(BrandColors.onSecondary)
+                Spacer(minLength: 0)
+                Text("\(groups.count)")
+                    .font(.brandBadge)
+                    .foregroundStyle(BrandColors.onTertiary)
+                    .monospacedDigit()
             }
 
             strip
@@ -110,26 +115,22 @@ private struct SectionBar: View {
 
     private var subtitle: String {
         switch section {
-        case .visible: "Always in the menu bar."
-        case .hidden: "Shown when you click the chevron."
-        case .alwaysHidden: "Shown when you ⌥-click the chevron."
+        case .visible: "always in the menu bar."
+        case .hidden: "shown when you click the chevron."
+        case .alwaysHidden: "shown when you ⌥-click the chevron."
         }
     }
 
-    /// Captured items are drawn for the real menu bar, which follows the app's appearance.
-    private var menuBarIsDark: Bool {
-        _ = colorScheme // re-evaluate when the appearance changes
-        return NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-    }
-
+    /// A menu bar strip: `surfaceElevated`, a one-pixel `separatorSolid` ring at radius 9. A drop
+    /// target turns the ring cyan and washes the fill.
     private var strip: some View {
-        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 9)
         return ScrollView(.horizontal) {
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 if groups.isEmpty {
-                    Text("Drop apps here")
-                        .font(.callout)
-                        .foregroundStyle(.tertiary)
+                    Text("drop items here")
+                        .font(.brandCaption)
+                        .foregroundStyle(BrandColors.onTertiary)
                         .frame(maxWidth: .infinity)
                 } else {
                     ForEach(groups) { group in
@@ -137,27 +138,20 @@ private struct SectionBar: View {
                     }
                 }
             }
-            .padding(.horizontal, 10)
-            .frame(minWidth: viewportWidth, minHeight: 52, alignment: .trailing)
+            .padding(.horizontal, 8)
+            .frame(minWidth: viewportWidth, minHeight: 44, alignment: .trailing)
         }
         .scrollIndicators(.never)
         .defaultScrollAnchor(.trailing)
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { viewportWidth = $0 }
-        .frame(height: 52)
-        .background(Color(white: menuBarIsDark ? 0.15 : 0.9), in: shape)
-        .overlay {
-            shape.strokeBorder(
-                isTargeted ? AnyShapeStyle(.tint) : AnyShapeStyle(.separator),
-                lineWidth: isTargeted ? 2 : 1
-            )
-        }
-        .overlay {
-            if isTargeted {
-                shape.fill(.tint.opacity(0.08)).allowsHitTesting(false)
-            }
-        }
-        .environment(\.colorScheme, menuBarIsDark ? .dark : .light)
-        .animation(.easeOut(duration: 0.15), value: isTargeted)
+        .frame(height: 44)
+        .background(isTargeted ? BrandColors.accentWash : .clear, in: shape)
+        .brandHairlineBorder(
+            cornerRadius: 9,
+            fill: BrandColors.surfaceElevated,
+            ring: isTargeted ? BrandColors.accent : BrandColors.separatorSolid
+        )
+        .animation(.easeOut(duration: 0.14), value: isTargeted)
         .dropDestination(for: AppGroupDrag.self) { items, _ in
             let moved = items.filter { drag in
                 groups.allSatisfy { $0.bundleIdentifier != drag.bundleIdentifier }
@@ -168,7 +162,7 @@ private struct SectionBar: View {
             return !items.isEmpty
         } isTargeted: { isTargeted = $0 }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(section.title) section")
+        .accessibilityLabel("\(section.settingsLabel) section")
     }
 }
 
@@ -180,27 +174,35 @@ private struct AppGroupChip: View {
 
     private static let maxImageHeight: CGFloat = 18
 
+    @State private var isHovered = false
+
     var body: some View {
         content
             .padding(.horizontal, 6)
-            .frame(height: 26)
-            .background(Color.primary.opacity(0.08), in: .rect(cornerRadius: 6, style: .continuous))
-            .contentShape(.rect(cornerRadius: 6))
+            .frame(height: 28)
+            .background(isHovered ? BrandColors.surfaceSelected : .clear, in: RoundedRectangle(cornerRadius: 6))
+            .contentShape(RoundedRectangle(cornerRadius: 6))
+            .onHover { isHovered = $0 }
+            .animation(.easeOut(duration: 0.12), value: isHovered)
             .help(group.name)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(group.name)
+            .accessibilityActions {
+                ForEach(MenuBarSection.allCases.filter { $0 != group.section }, id: \.self) { section in
+                    Button("move to \(section.settingsLabel)") { onMove(group.bundleIdentifier, section) }
+                }
+            }
             .draggable(AppGroupDrag(bundleIdentifier: group.bundleIdentifier)) {
                 content
                     .padding(.horizontal, 6)
-                    .frame(height: 26)
-                    .background(.regularMaterial, in: .rect(cornerRadius: 6, style: .continuous))
+                    .frame(height: 28)
+                    .brandHairlineBorder(cornerRadius: 7, fill: BrandColors.surfaceHigh)
+                    .environment(\.colorScheme, .dark)
             }
-            .contextMenu {
-                ForEach(MenuBarSection.allCases, id: \.self) { section in
-                    if section != group.section {
-                        Button("Move to \(section.title)") {
-                            onMove(group.bundleIdentifier, section)
-                        }
+            .brandContextMenu {
+                MenuBarSection.allCases.filter { $0 != group.section }.map { section in
+                    BrandMenu.Item("move to \(section.settingsLabel)", symbol: section.symbolName) {
+                        onMove(group.bundleIdentifier, section)
                     }
                 }
             }
@@ -216,12 +218,14 @@ private struct AppGroupChip: View {
                     .frame(width: 18, height: 18)
             } else if group.isSystem, let item = SystemItem(key: group.bundleIdentifier) {
                 Image(systemName: item.symbolName)
-                    .font(.system(size: 13))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(BrandColors.on)
                     .frame(width: 18, height: 18)
             } else {
                 Image(systemName: "app.dashed")
+                    .font(.system(size: 13, weight: .medium))
                     .frame(width: 18, height: 18)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(BrandColors.onSecondary)
             }
         } else {
             HStack(spacing: 2) {
@@ -247,45 +251,23 @@ private struct AppGroupChip: View {
     }
 }
 
-// MARK: - Callout
-
-private struct Callout: View {
-    let systemImage: String
-    let tint: Color
-    let title: String
-    let message: String
-    var actionTitle: String?
-    var action: (() -> Void)?
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Image(systemName: systemImage)
-                .font(.title2)
-                .foregroundStyle(tint)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).fontWeight(.semibold)
-                Text(message)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-            if let actionTitle, let action {
-                Button(actionTitle, action: action)
-            }
+private extension MenuBarSection {
+    var symbolName: String {
+        switch self {
+        case .visible: "eye"
+        case .hidden: "eye.slash"
+        case .alwaysHidden: "lock"
         }
-        .padding(12)
-        .background(tint.opacity(0.1), in: .rect(cornerRadius: 10, style: .continuous))
     }
 }
 
 // MARK: - Drag payload
 
 extension UTType {
-    static let baaarAppGroup = UTType(exportedAs: "com.aaangelmartin.baaar.app-group", conformingTo: .data)
+    static let baaarAppGroup = UTType(exportedAs: "com.laaabs.baaar.app-group", conformingTo: .data)
 }
 
-/// What a dragged chip carries: just the app it stands for.
+/// What a dragged chip carries: just the owner (bundle or system item key) it stands for.
 struct AppGroupDrag: Codable, Transferable {
     private static let stringPrefix = "baaar-app-group:"
 

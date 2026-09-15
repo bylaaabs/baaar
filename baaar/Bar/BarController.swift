@@ -29,7 +29,8 @@ final class BarController {
 
     /// - Parameters:
     ///   - anchor: The chevron's frame in AppKit screen coordinates; the bar is centred under it.
-    ///   - appearance: The menu bar's appearance, so captured icons stay legible.
+    ///   - appearance: The menu bar's appearance. The bar is always drawn dark now, so captured
+    ///     icons (white glyphs from a dark menu bar) read as they do there; kept for callers.
     func show(entries: [BarEntry], message: String?, mode: DisplayMode, anchor: CGRect?, screen: NSScreen?, appearance: NSAppearance?) {
         close()
         shownItemIDs = entries.map(\.item.id)
@@ -43,33 +44,42 @@ final class BarController {
         }
         let content = Self.layout(views, mode: mode)
         if let message {
-            let label = NSTextField(labelWithString: message)
-            label.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-            label.textColor = .secondaryLabelColor
+            let label = NSTextField(labelWithString: message.lowercased())
+            label.font = .brandCaption
+            label.textColor = BrandColors.nsOnSecondary
             content.addArrangedSubview(label)
+            if views.isEmpty {
+                content.edgeInsets = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
+            }
         }
 
-        let glass = NSGlassEffectView()
-        glass.cornerRadius = mode == .bar ? 16 : 14
-        glass.contentView = content
-
-        let size = content.fittingSize
+        let fitting = content.fittingSize
         let margin: CGFloat = 8
-        let width = min(max(size.width, 44), screen.frame.width - margin * 2)
-        let height = min(size.height, screen.visibleFrame.height - margin * 2)
+        let width = min(max(fitting.width, 44), screen.frame.width - margin * 2)
+        let height = min(max(fitting.height, 30), screen.visibleFrame.height - margin * 2)
         let centerX = anchor?.midX ?? screen.frame.maxX - width / 2 - margin
         let x = min(max(centerX - width / 2, screen.frame.minX + margin), screen.frame.maxX - width - margin)
         let top = min(anchor?.minY ?? screen.visibleFrame.maxY, screen.visibleFrame.maxY) - 6
-        let frame = NSRect(x: x, y: top - height, width: width, height: height)
+        let surfaceFrame = NSRect(x: x, y: top - height, width: width, height: height)
+
+        // The panel is larger than the surface by the shadow's reach, so the shadow isn't clipped.
+        let insets = BarContainerView.shadowInsets
+        let frame = NSRect(
+            x: surfaceFrame.minX - insets.left,
+            y: surfaceFrame.minY - insets.bottom,
+            width: surfaceFrame.width + insets.left + insets.right,
+            height: surfaceFrame.height + insets.top + insets.bottom
+        )
 
         let panel = BarPanel(contentRect: frame)
-        panel.appearance = appearance
-        panel.contentView = glass
+        panel.appearance = NSAppearance(named: .darkAqua)
+        panel.contentView = BarContainerView(content: content)
         panel.onCancel = { [weak self] in self?.close() }
         panel.alphaValue = 0
         panel.makeKeyAndOrderFront(nil)
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.12
+            context.duration = 0.14
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().alphaValue = 1
         }
         self.panel = panel
@@ -84,7 +94,8 @@ final class BarController {
 
     private static func layout(_ views: [BarItemView], mode: DisplayMode) -> NSStackView {
         let content = NSStackView()
-        content.edgeInsets = NSEdgeInsets(top: 6, left: 6, bottom: 6, right: 6)
+        content.translatesAutoresizingMaskIntoConstraints = false
+        content.edgeInsets = NSEdgeInsets(top: 5, left: 5, bottom: 5, right: 5)
         switch mode {
         case .bar, .menuBar:
             content.orientation = .horizontal
@@ -148,7 +159,9 @@ private final class BarPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle, .transient]
         backgroundColor = .clear
         isOpaque = false
-        hasShadow = true
+        // The surface draws the brand shadow itself; the system one would follow the panel's
+        // transparent margin rather than the rounded surface.
+        hasShadow = false
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
     }
@@ -165,6 +178,87 @@ private final class BarPanel: NSPanel {
     }
 }
 
+/// The panel's content: a transparent margin for the shadow around the brand surface.
+private final class BarContainerView: NSView {
+    /// How far the overlay shadow (black .35, radius 12, 4 pt down) reaches past the surface. The top
+    /// stops at the 6 pt gap under the menu bar, so the panel never covers the chevron.
+    static let shadowInsets = NSEdgeInsets(top: 6, left: 18, bottom: 22, right: 18)
+
+    init(content: NSView) {
+        super.init(frame: .zero)
+        let surface = BarSurfaceView()
+        surface.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(surface)
+        surface.addSubview(content)
+
+        let insets = Self.shadowInsets
+        let fill = [
+            content.leadingAnchor.constraint(equalTo: surface.leadingAnchor),
+            content.trailingAnchor.constraint(equalTo: surface.trailingAnchor),
+            content.topAnchor.constraint(equalTo: surface.topAnchor),
+            content.bottomAnchor.constraint(equalTo: surface.bottomAnchor),
+        ]
+        // Fill the surface when the content can stretch, stay centred when it can't (the 44 pt minimum).
+        fill.forEach { $0.priority = .defaultHigh }
+        NSLayoutConstraint.activate(fill + [
+            content.centerXAnchor.constraint(equalTo: surface.centerXAnchor),
+            content.centerYAnchor.constraint(equalTo: surface.centerYAnchor),
+            content.widthAnchor.constraint(lessThanOrEqualTo: surface.widthAnchor),
+            content.heightAnchor.constraint(lessThanOrEqualTo: surface.heightAnchor),
+            surface.leadingAnchor.constraint(equalTo: leadingAnchor, constant: insets.left),
+            surface.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -insets.right),
+            surface.topAnchor.constraint(equalTo: topAnchor, constant: insets.top),
+            surface.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -insets.bottom),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is not supported")
+    }
+}
+
+/// `surfaceElevated`, radius 9, a one-pixel `separatorSolid` ring and the overlay shadow.
+private final class BarSurfaceView: NSView {
+    private static let cornerRadius: CGFloat = 9
+
+    init() {
+        super.init(frame: .zero)
+        wantsLayer = true
+        layerContentsRedrawPolicy = .onSetNeedsDisplay
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is not supported")
+    }
+
+    override var wantsUpdateLayer: Bool { true }
+
+    override func updateLayer() {
+        guard let layer else { return }
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        layer.backgroundColor = BrandColors.nsSurfaceElevated.cgColor
+        layer.cornerRadius = Self.cornerRadius
+        layer.borderWidth = 1 / scale
+        layer.borderColor = BrandColors.nsSeparatorSolid.cgColor
+        layer.shadowColor = NSColor.black.cgColor
+        layer.shadowOpacity = 0.35
+        layer.shadowRadius = 12
+        layer.shadowOffset = CGSize(width: 0, height: -4)
+    }
+
+    override func layout() {
+        super.layout()
+        layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: Self.cornerRadius, cornerHeight: Self.cornerRadius, transform: nil)
+    }
+
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        needsDisplay = true
+    }
+}
+
 /// One hidden item: an icon cell, or an icon-and-name row in the list.
 private final class BarItemView: NSView {
     var onPress: (() -> Void)?
@@ -173,8 +267,8 @@ private final class BarItemView: NSView {
     private static let iconSlot: CGFloat = 22
     private static let horizontalPadding: CGFloat = 7
 
-    private var isHovered = false { didSet { needsDisplay = true } }
-    private var isPressed = false { didSet { needsDisplay = true } }
+    private var isHovered = false { didSet { if isHovered != oldValue { needsDisplay = true } } }
+    private var isPressed = false { didSet { if isPressed != oldValue { needsDisplay = true } } }
 
     init(entry: BarEntry, showsName: Bool, fixedWidth: CGFloat?) {
         super.init(frame: .zero)
@@ -199,7 +293,7 @@ private final class BarItemView: NSView {
             // Apple's items have no app icon; show their symbol until they're pictured.
             let symbol = NSImage(systemSymbolName: entry.item.systemItem?.symbolName ?? "questionmark.square.dashed", accessibilityDescription: entry.item.displayName)
             imageView.image = symbol?.withSymbolConfiguration(.init(pointSize: 14, weight: .medium))
-            imageView.contentTintColor = .labelColor
+            imageView.contentTintColor = BrandColors.nsOn
             imageSize = NSSize(width: 18, height: 18)
         }
         if let fixedWidth, imageSize.width > fixedWidth - 8 {
@@ -217,7 +311,8 @@ private final class BarItemView: NSView {
         if showsName {
             let label = NSTextField(labelWithString: entry.item.displayName)
             label.translatesAutoresizingMaskIntoConstraints = false
-            label.font = .menuFont(ofSize: 0)
+            label.font = .brandBody
+            label.textColor = BrandColors.nsOn
             label.lineBreakMode = .byTruncatingTail
             addSubview(label)
             constraints += [
@@ -244,8 +339,9 @@ private final class BarItemView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         guard isHovered || isPressed else { return }
-        NSColor.labelColor.withAlphaComponent(isPressed ? 0.22 : 0.1).setFill()
-        NSBezierPath(roundedRect: bounds, xRadius: 8, yRadius: 8).fill()
+        // surfaceSelected on hover, one rung up (separator) while pressed.
+        (isPressed ? BrandColors.nsSeparator : BrandColors.nsSurfaceSelected).setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: 6, yRadius: 6).fill()
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }

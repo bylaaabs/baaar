@@ -4,27 +4,35 @@ struct PermissionsPane: View {
     let model: AppModel
 
     var body: some View {
-        Form {
-            Section {
-                PermissionRow(
-                    title: "Accessibility",
-                    badge: "Required",
-                    message: "Lists and opens menu bar items.",
-                    systemImage: "accessibility",
-                    isGranted: model.hasAccessibility,
-                    grant: model.requestAccessibility
-                )
-                PermissionRow(
-                    title: "Screen Recording",
-                    badge: "Optional",
-                    message: "Shows the real icons in the bar; without it baaar uses app icons. baaar only captures the menu bar and never records video.",
-                    systemImage: "rectangle.dashed.badge.record",
-                    isGranted: model.hasScreenRecording,
-                    grant: model.requestScreenRecording
-                )
+        VStack(alignment: .leading, spacing: 24) {
+            BrandBlock("permissions") {
+                VStack(alignment: .leading, spacing: 16) {
+                    PermissionRow(
+                        title: "accessibility",
+                        badge: "required",
+                        message: "lists and opens menu bar items.",
+                        systemImage: "accessibility",
+                        isGranted: model.hasAccessibility,
+                        grant: model.requestAccessibility
+                    )
+                    BrandHLine()
+                    PermissionRow(
+                        title: "screen recording",
+                        badge: "optional",
+                        message: "shows the real icons in the bar; without it baaar shows each tool's own icon. baaar only captures the menu bar and never records video.",
+                        systemImage: "rectangle.dashed.badge.record",
+                        isGranted: model.hasScreenRecording,
+                        grant: model.requestScreenRecording
+                    )
+                }
+                .brandCard()
             }
+
+            Text("macOS does not say when access changes, so this page checks every second while it is open.")
+                .font(.brandCaption)
+                .foregroundStyle(BrandColors.onTertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .formStyle(.grouped)
         .task {
             // System Settings doesn't notify anyone when access changes, so poll while visible.
             while !Task.isCancelled {
@@ -50,39 +58,40 @@ private struct PermissionRow: View {
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             Image(systemName: systemImage)
-                .font(.title2)
-                .foregroundStyle(.tint)
-                .frame(width: 28)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(isGranted ? BrandColors.accent : BrandColors.onSecondary)
+                .frame(width: 20)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(title)
-                    Text(badge)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
-                        .background(.fill.tertiary, in: .capsule)
+                        .font(.brandBody)
+                        .foregroundStyle(BrandColors.on)
+                    BrandBadge(text: badge)
                 }
                 Text(message)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .font(.brandCaption)
+                    .foregroundStyle(BrandColors.onSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 12)
 
             if isGranted {
-                Label("Granted", systemImage: "checkmark.circle.fill")
-                    .labelStyle(.iconOnly)
-                    .font(.title2)
-                    .foregroundStyle(.green)
-                    .help("Granted")
+                HStack(spacing: 5) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 12, weight: .medium))
+                    Text("granted")
+                        .font(.brandCaption)
+                }
+                .foregroundStyle(BrandColors.success)
+                .transition(.opacity)
             } else {
-                Button("Grant…", action: grant)
+                PillButton("grant", action: grant)
+                    .transition(.opacity)
             }
         }
-        .padding(.vertical, 4)
+        .animation(.easeOut(duration: 0.14), value: isGranted)
         .accessibilityElement(children: .combine)
     }
 }

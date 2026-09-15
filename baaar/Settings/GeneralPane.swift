@@ -9,86 +9,56 @@ struct GeneralPane: View {
     }
 
     var body: some View {
-        Form {
-            Section("Show hidden items") {
-                HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 24) {
+            BrandBlock("show hidden items") {
+                HStack(spacing: 10) {
                     ForEach(DisplayMode.allCases, id: \.self) { mode in
                         DisplayModeCard(mode: mode, chevronStyle: model.chevronStyle, isSelected: model.displayMode == mode) {
                             model.displayMode = mode
                         }
                     }
                 }
-                .padding(.vertical, 4)
             }
 
-            Section {
-                LabeledContent {
-                    HStack(spacing: 4) {
-                        ForEach(ChevronStyle.allCases, id: \.self) { style in
-                            ChevronStyleButton(
-                                style: style,
-                                direction: restingDirection,
-                                isSelected: model.chevronStyle == style
-                            ) {
-                                model.chevronStyle = style
+            BrandBlock("chevron") {
+                VStack(alignment: .leading, spacing: 16) {
+                    BrandRow("icon", detail: "points where hidden items appear: sideways in the menu bar, down for the bar, list and grid.") {
+                        BrandSegmented(
+                            selection: $model.chevronStyle,
+                            options: ChevronStyle.allCases.map { style in
+                                .init(value: style, label: "", symbol: style.symbolName(restingDirection), help: style.settingsLabel)
                             }
-                        }
+                        )
                     }
-                } label: {
-                    Text("Chevron icon")
-                    Text("The chevron points where hidden items appear: sideways in the menu bar, down for the bar, list and grid.")
-                }
-
-                Picker(selection: $model.newAppSection) {
-                    ForEach(MenuBarSection.allCases, id: \.self) { section in
-                        Text(section.title).tag(section)
+                    BrandHLine()
+                    BrandRow("new items go to", detail: "where baaar puts menu bar items it has not seen before.") {
+                        BrandSegmented(
+                            selection: $model.newAppSection,
+                            options: MenuBarSection.allCases.map { .init(value: $0, label: $0.settingsLabel) }
+                        )
                     }
-                } label: {
-                    Text("New apps go to")
-                    Text("Where apps baaar hasn't seen before are placed.")
                 }
-                .pickerStyle(.menu)
+                .brandCard()
             }
 
-            Section {
-                Toggle(isOn: $model.autoRehide) {
-                    Text("Hide items again automatically")
-                    Text("In the menu bar mode, hidden items tuck away when you click elsewhere or after 15 seconds away from the menu bar.")
+            BrandBlock("behavior") {
+                VStack(alignment: .leading, spacing: 16) {
+                    BrandRow("hide again automatically", detail: "in menu bar mode, hidden items tuck away when you click elsewhere or after 15 seconds away from the menu bar.") {
+                        BrandToggle(isOn: $model.autoRehide, label: "hide again automatically")
+                    }
+                    BrandHLine()
+                    BrandRow("launch at login") {
+                        BrandToggle(isOn: $model.launchesAtLogin, label: "launch at login")
+                    }
                 }
-                Toggle("Launch at login", isOn: $model.launchesAtLogin)
-            } footer: {
-                Text("Click the chevron to show hidden items. ⌥-click it, or use Show All in its menu, to include always-hidden ones. The baaar icon opens this window.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                .brandCard()
             }
-        }
-        .formStyle(.grouped)
-    }
-}
 
-private struct ChevronStyleButton: View {
-    let style: ChevronStyle
-    let direction: ChevronDirection
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: style.symbolName(direction))
-                .font(.system(size: 13, weight: .semibold))
-                .frame(width: 30, height: 24)
-                .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-                .background(
-                    isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.fill.quaternary),
-                    in: .rect(cornerRadius: 6, style: .continuous)
-                )
-                .contentShape(.rect(cornerRadius: 6))
+            Text("click the chevron to show hidden items. ⌥-click it, or pick show all in its menu, to include always hidden ones. the baaar icon opens this window.")
+                .font(.brandCaption)
+                .foregroundStyle(BrandColors.onTertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .buttonStyle(.plain)
-        .help(style.title)
-        .accessibilityLabel(style.title)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -98,35 +68,39 @@ private struct DisplayModeCard: View {
     let isSelected: Bool
     let action: () -> Void
 
+    @State private var isHovered = false
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 8) {
-                DisplayModePreview(mode: mode, chevronStyle: chevronStyle)
+                DisplayModePreview(mode: mode, chevronStyle: chevronStyle, isSelected: isSelected)
                     .frame(height: 64)
                     .frame(maxWidth: .infinity)
-                    .background(.fill.quaternary, in: .rect(cornerRadius: 6))
+                    .background(BrandColors.surface, in: RoundedRectangle(cornerRadius: 7))
 
-                Text(mode.title)
-                    .font(.callout)
-                    .fontWeight(isSelected ? .semibold : .regular)
-                    .foregroundStyle(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
+                Text(mode.settingsLabel)
+                    .font(isSelected ? .brandButton : .brandCallout)
+                    .foregroundStyle(isSelected ? BrandColors.on : BrandColors.onSecondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
             .padding(8)
             .frame(maxWidth: .infinity)
-            .background(.background, in: .rect(cornerRadius: 10))
+            .background(
+                isSelected ? BrandColors.accentWash : (isHovered ? BrandColors.surfaceHover : BrandColors.surfaceTrack),
+                in: RoundedRectangle(cornerRadius: 10)
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(
-                        isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.separator),
-                        lineWidth: isSelected ? 2 : 1
-                    )
+                    .strokeBorder(isSelected ? BrandColors.accent : BrandColors.separator, lineWidth: 1)
             }
-            .contentShape(.rect(cornerRadius: 10))
+            .contentShape(RoundedRectangle(cornerRadius: 10))
+            .animation(.easeOut(duration: 0.12), value: isHovered)
+            .animation(.easeOut(duration: 0.14), value: isSelected)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(mode.title)
+        .onHover { isHovered = $0 }
+        .accessibilityLabel(mode.settingsLabel)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
@@ -135,8 +109,11 @@ private struct DisplayModeCard: View {
 private struct DisplayModePreview: View {
     let mode: DisplayMode
     let chevronStyle: ChevronStyle
+    let isSelected: Bool
 
     private let dot: CGFloat = 4
+
+    private var hiddenColor: Color { isSelected ? BrandColors.accent : BrandColors.onSecondary }
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 4) {
@@ -150,7 +127,8 @@ private struct DisplayModePreview: View {
                 }
                 .padding(.horizontal, 5)
                 .padding(.vertical, 3)
-                .background(.fill.secondary, in: .capsule)
+                .background(BrandColors.surfaceHigh, in: RoundedRectangle(cornerRadius: 3))
+                .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(BrandColors.separatorSolid, lineWidth: 0.5))
                 .padding(.trailing, 14)
             case .list:
                 VStack(alignment: .leading, spacing: 3) {
@@ -158,13 +136,14 @@ private struct DisplayModePreview: View {
                         HStack(spacing: 3) {
                             hiddenDot
                             RoundedRectangle(cornerRadius: 1)
-                                .fill(.secondary)
+                                .fill(BrandColors.onTertiary)
                                 .frame(width: 18, height: 2)
                         }
                     }
                 }
                 .padding(4)
-                .background(.fill.secondary, in: .rect(cornerRadius: 3))
+                .background(BrandColors.surfaceHigh, in: RoundedRectangle(cornerRadius: 3))
+                .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(BrandColors.separatorSolid, lineWidth: 0.5))
                 .padding(.trailing, 12)
             case .grid:
                 VStack(spacing: 2) {
@@ -172,14 +151,15 @@ private struct DisplayModePreview: View {
                         HStack(spacing: 2) {
                             ForEach(0..<3, id: \.self) { _ in
                                 RoundedRectangle(cornerRadius: 1)
-                                    .fill(.tint)
+                                    .fill(hiddenColor)
                                     .frame(width: 5, height: 5)
                             }
                         }
                     }
                 }
                 .padding(4)
-                .background(.fill.secondary, in: .rect(cornerRadius: 3))
+                .background(BrandColors.surfaceHigh, in: RoundedRectangle(cornerRadius: 3))
+                .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(BrandColors.separatorSolid, lineWidth: 0.5))
                 .padding(.trailing, 12)
             }
             Spacer(minLength: 0)
@@ -196,17 +176,17 @@ private struct DisplayModePreview: View {
             }
             Image(systemName: chevronStyle.symbolName(mode == .menuBar ? .left : .down))
                 .font(.system(size: 5, weight: .bold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(BrandColors.onSecondary)
             ForEach(0..<3, id: \.self) { _ in
-                Circle().fill(.secondary).frame(width: dot, height: dot)
+                Circle().fill(BrandColors.onTertiary).frame(width: dot, height: dot)
             }
         }
         .padding(.horizontal, 5)
         .frame(height: 9)
-        .background(.fill.tertiary, in: .rect(cornerRadius: 2))
+        .background(BrandColors.surfaceElevated, in: RoundedRectangle(cornerRadius: 2))
     }
 
     private var hiddenDot: some View {
-        Circle().fill(.tint).frame(width: dot, height: dot)
+        Circle().fill(hiddenColor).frame(width: dot, height: dot)
     }
 }
