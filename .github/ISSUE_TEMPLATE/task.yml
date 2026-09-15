@@ -1,0 +1,31 @@
+name: Task
+description: Planned work
+type: Task
+labels: ["type: feature"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What needs doing
+      description: Be concrete. If it does not fit in a week, split it before opening this.
+    validations: {required: true}
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What it unblocks, or which problem it solves.
+    validations: {required: true}
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of done
+      description: How we know it is finished. Checkboxes, ticked as each one is met.
+      value: |
+        - [ ]
+    validations: {required: true}
+  - type: markdown
+    attributes:
+      value: >
+        Before saving, fix the **type** label if this is not a feature, and add an **area** label
+        (menu-bar, bar, capture, layout, settings, permissions, design, distribution, ci, l10n),
+        a **size** label, the phase **milestone** and an assignee.

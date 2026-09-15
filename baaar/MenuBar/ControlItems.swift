@@ -1,0 +1,88 @@
+import AppKit
+
+/// baaar's two status items: the chevron, which hides and shows, and the app icon, which opens settings.
+@MainActor
+final class ControlItems {
+    enum Identifier {
+        static let app = "baaar.app"
+        static let chevron = "baaar.chevron"
+    }
+
+    let appItem: NSStatusItem
+    let chevronItem: NSStatusItem
+
+    var onAppClick: ((NSEvent?) -> Void)?
+    var onChevronClick: ((NSEvent?) -> Void)?
+
+    init() {
+        // Autosave names are kept from earlier builds so macOS keeps the spots the user ⌘-dragged them to.
+        Self.seedPreferredPosition(1, for: "baaarToggle")
+        Self.seedPreferredPosition(2, for: "baaarDivider")
+
+        appItem = Self.makeItem(autosaveName: "baaarToggle", identifier: Identifier.app)
+        chevronItem = Self.makeItem(autosaveName: "baaarDivider", identifier: Identifier.chevron)
+
+        appItem.button?.image = Self.symbol("menubar.rectangle", description: "baaar settings")
+        appItem.button?.target = self
+        appItem.button?.action = #selector(appClicked)
+        appItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+
+        chevronItem.button?.target = self
+        chevronItem.button?.action = #selector(chevronClicked)
+        chevronItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+    }
+
+    var screen: NSScreen? {
+        chevronItem.button?.window?.screen ?? NSScreen.main
+    }
+
+    var menuBarAppearance: NSAppearance? {
+        chevronItem.button?.effectiveAppearance
+    }
+
+    /// Shows the chevron in the chosen style, pointing where hidden items appear.
+    func setChevron(style: ChevronStyle, direction: ChevronDirection, hasHiddenItems: Bool) {
+        let isOpen = direction == .right || direction == .up
+        let description = isOpen ? "Hide menu bar items" : "Show hidden menu bar items"
+        chevronItem.button?.image = Self.symbol(style.symbolName(direction), description: description)
+        chevronItem.button?.appearsDisabled = !hasHiddenItems && !isOpen
+    }
+
+    /// Takes baaar's own items out of the menu bar drawing while hidden items are pictured:
+    /// macOS 27 stops updating their frames after the bar reflows, so they can't be told apart from a capture.
+    func setBlank(_ blank: Bool) {
+        for item in [appItem, chevronItem] {
+            item.length = blank ? 0 : NSStatusItem.variableLength
+            item.button?.isHidden = blank
+        }
+    }
+
+    @objc private func appClicked() {
+        onAppClick?(NSApp.currentEvent)
+    }
+
+    @objc private func chevronClicked() {
+        onChevronClick?(NSApp.currentEvent)
+    }
+
+    private static func makeItem(autosaveName: String, identifier: String) -> NSStatusItem {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.autosaveName = autosaveName
+        item.button?.setAccessibilityIdentifier(identifier)
+        return item
+    }
+
+    private static func seedPreferredPosition(_ position: Double, for autosaveName: String) {
+        let key = "NSStatusItem Preferred Position \(autosaveName)"
+        if UserDefaults.standard.object(forKey: key) == nil {
+            UserDefaults.standard.set(position, forKey: key)
+        }
+    }
+
+    private static func symbol(_ name: String, description: String) -> NSImage? {
+        let configuration = NSImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+        let image = NSImage(systemSymbolName: name, accessibilityDescription: description)?.withSymbolConfiguration(configuration)
+        image?.isTemplate = true
+        return image
+    }
+}

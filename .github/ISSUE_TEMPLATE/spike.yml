@@ -1,0 +1,24 @@
+name: Spike
+description: Time-boxed research with a disposable result
+type: Task
+labels: ["type: spike"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: The question it answers
+      description: One question, answerable yes or no.
+      placeholder: "Does MenuBarAgent accept per-item identifiers in the restriction?"
+    validations: {required: true}
+  - type: input
+    id: timebox
+    attributes:
+      label: Time box
+      placeholder: "2 days"
+    validations: {required: true}
+  - type: textarea
+    id: output
+    attributes:
+      label: What is left afterwards
+      description: Usually a comment with the findings and an entry in docs/20-decision-log.md. The code gets thrown away.
+    validations: {required: true}

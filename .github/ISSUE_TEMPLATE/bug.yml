@@ -1,0 +1,38 @@
+name: Bug
+description: Something does not work as it should
+type: Bug
+labels: ["type: fix"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+    validations: {required: true}
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: Exact steps. If it is intermittent, say so.
+    validations: {required: true}
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should happen
+    validations: {required: true}
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: macOS build, baaar version and build, display mode, and whether Screen Recording is granted.
+      placeholder: "macOS 27.0 / baaar 0.1.0 (1) / grid / Screen Recording granted"
+    validations: {required: true}
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: >
+        Optional. Run `/Applications/baaar.app/Contents/MacOS/baaar --diagnose` and attach
+        `~/Library/Logs/baaar/diagnostics.txt`. It lists the names of your menu bar items, so read it first.
+  - type: markdown
+    attributes:
+      value: "If this is a **security** problem, do not open it here. Read `SECURITY.md`."
