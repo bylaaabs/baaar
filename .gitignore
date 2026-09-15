@@ -3,3 +3,10 @@ build/
 DerivedData/
 *.xcodeproj/
 xcuserdata/
+
+## Secrets / signing
+*.p12
+*.mobileprovision
+*.provisionprofile
+*.cer
+AppStoreConnect*.json
