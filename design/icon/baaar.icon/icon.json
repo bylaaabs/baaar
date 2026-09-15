@@ -1,0 +1,36 @@
+{
+  "fill" : {
+    "solid" : "srgb:0.03922,0.03922,0.03922,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "image-name" : "baaar glyph 1500.png",
+          "name" : "baaar glyph 1500",
+          "position" : {
+            "scale" : 0.68267,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}

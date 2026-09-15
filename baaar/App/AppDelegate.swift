@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Settings.migrateFromLegacyDomain()
         Settings.migrateLegacySections()
         controller = MenuBarController(controls: ControlItems())
         model.controller = controller
@@ -132,7 +133,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func presentPanel(items: [MenuBarItem], snapshot: MenuBarSnapshot) {
         let entries = items.map { BarEntry(item: $0, image: controller.images.image(for: $0)) }
-        let message = entries.isEmpty ? "Nothing hidden yet - open Settings to hide items" : nil
+        let message = entries.isEmpty ? "nothing hidden yet - open settings to hide items" : nil
         bar.show(entries: entries, message: message, mode: Settings.displayMode, anchor: Self.ownFrame(ControlItems.Identifier.chevron, in: snapshot), screen: controls.screen, appearance: controls.menuBarAppearance)
         controller.isPanelOpen = true
     }
@@ -216,7 +217,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Debug
 
     #if DEBUG
-    /// Lets scripts drive the app through distributed notifications named `com.aaangelmartin.baaar.debug.<command>`,
+    /// Lets scripts drive the app through distributed notifications named `com.laaabs.baaar.debug.<command>`,
     /// with an optional string argument as the notification object.
     private func listenForDebugCommands() {
         let commands: [String: @MainActor (AppDelegate, String?) async -> Void] = [
@@ -270,7 +271,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             },
         ]
         for (name, command) in commands {
-            DistributedNotificationCenter.default().addObserver(forName: .init("com.aaangelmartin.baaar.debug.\(name)"), object: nil, queue: .main) { [weak self] note in
+            DistributedNotificationCenter.default().addObserver(forName: .init("com.laaabs.baaar.debug.\(name)"), object: nil, queue: .main) { [weak self] note in
                 let argument = note.object as? String
                 Task { @MainActor in
                     guard let self else { return }

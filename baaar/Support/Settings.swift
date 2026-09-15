@@ -195,6 +195,34 @@ enum Settings {
         sections[bundle] = section
     }
 
+    /// The defaults domain of the builds signed as `com.aaangelmartin.baaar`, before baaar moved to laaabs.
+    private static let legacyDomain = "com.aaangelmartin.baaar"
+
+    /// Copies the settings of the `com.aaangelmartin.baaar` builds into this bundle's domain, once.
+    ///
+    /// The defaults domain follows the bundle identifier, so without this the move to
+    /// `com.laaabs.baaar` would forget every section, preference and status item position.
+    /// Keys already set here win. Runs before any status item is created, so the positions apply.
+    static func migrateFromLegacyDomain() {
+        let flag = "migratedFromAaangelmartinDomain"
+        guard !defaults.bool(forKey: flag) else { return }
+        defer { defaults.set(true, forKey: flag) }
+        // Only what the old domain itself stored, without the global and registration domains a suite would add.
+        guard Bundle.main.bundleIdentifier != legacyDomain,
+              let legacy = defaults.persistentDomain(forName: legacyDomain) else { return }
+        let keys: Set<String> = [
+            Key.sections, Key.displayMode, Key.autoRehide, Key.didOnboard, Key.legacyItemSections,
+            "chevronStyle", "newAppSection", "knownKeys",
+        ]
+        var copied = 0
+        for (key, value) in legacy where keys.contains(key) || key.hasPrefix("NSStatusItem Preferred Position ") {
+            guard defaults.object(forKey: key) == nil else { continue }
+            defaults.set(value, forKey: key)
+            copied += 1
+        }
+        Log.write("migrated \(copied) settings from \(legacyDomain)")
+    }
+
     /// Carries over sections from the divider-based builds, which stored them per item ("bundle/label").
     static func migrateLegacySections() {
         guard defaults.object(forKey: Key.sections) == nil,

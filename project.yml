@@ -1,7 +1,7 @@
 name: baaar
 
 options:
-  bundleIdPrefix: com.aaangelmartin
+  bundleIdPrefix: com.laaabs
   deploymentTarget:
     macOS: "26.0"
   createIntermediateGroups: true
@@ -10,7 +10,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "0.1.0"
+    MARKETING_VERSION: "0.4.0"
     CURRENT_PROJECT_VERSION: "1"
     DEVELOPMENT_TEAM: 3862GT8D5W
     CODE_SIGN_STYLE: Manual
@@ -18,19 +18,28 @@ settings:
     ENABLE_HARDENED_RUNTIME: YES
     DEAD_CODE_STRIPPING: YES
     SWIFT_STRICT_CONCURRENCY: complete
+    # English is the source language; Spanish ships from day one (baaar/Resources/Localizable.xcstrings).
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+    SWIFT_EMIT_LOC_STRINGS: YES
 
 targets:
   baaar:
     type: application
     platform: macOS
     sources:
+      # Swift, baaar/Assets.xcassets (wordmark) and baaar/Resources (string catalog, fonts).
       - path: baaar
+      # Icon Composer app icon (Liquid Glass). actool compiles the .icon bundle
+      # named by ASSETCATALOG_COMPILER_APPICON_NAME (basename: baaar).
+      - path: design/icon/baaar.icon
+        type: file
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.aaangelmartin.baaar
+        PRODUCT_BUNDLE_IDENTIFIER: com.laaabs.baaar
         PRODUCT_NAME: baaar
+        ASSETCATALOG_COMPILER_APPICON_NAME: baaar
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSUIElement: YES
         INFOPLIST_KEY_CFBundleDisplayName: baaar
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
-        INFOPLIST_KEY_NSHumanReadableCopyright: "© 2026 Ángel Martín"
+        INFOPLIST_KEY_NSHumanReadableCopyright: "© 2026 laaabs."

@@ -7,7 +7,7 @@ import ApplicationServices
 /// no longer exist; each app's `AXExtrasMenuBar` is the only public item list.
 enum ItemScanner {
     private static let messagingTimeout: Float = 0.25
-    private static let queue = DispatchQueue(label: "com.aaangelmartin.baaar.scanner", qos: .userInitiated, attributes: .concurrent)
+    private static let queue = DispatchQueue(label: "com.laaabs.baaar.scanner", qos: .userInitiated, attributes: .concurrent)
 
     /// Scans every app in parallel on a dedicated queue, so blocking AX calls never tie up
     /// Swift's shared thread pool and one slow app only costs its own timeout.
