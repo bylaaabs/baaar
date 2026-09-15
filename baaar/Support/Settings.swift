@@ -1,7 +1,7 @@
 import Foundation
 import ServiceManagement
 
-/// The three parts of the menu bar baaar manages, left to right: always hidden, hidden, visible.
+/// The three sections of the menu bar. baaar assigns whole apps to them.
 enum MenuBarSection: String, CaseIterable, Sendable {
     case visible
     case hidden
@@ -42,28 +42,11 @@ enum Settings {
     private static let defaults = UserDefaults.standard
 
     private enum Key {
-        static let collapsed = "collapsed"
-        static let didOnboard = "didOnboard"
+        static let sections = "appSections"
         static let displayMode = "displayMode"
-        static let sections = "itemSections"
-        static let dividerMinX = "dividerMinX"
-        static let statusAreaMinX = "statusAreaMinX"
-    }
-
-    /// Whether the hidden sections were collapsed when baaar last ran.
-    static var collapsed: Bool {
-        get { defaults.object(forKey: Key.collapsed) as? Bool ?? true }
-        set { defaults.set(newValue, forKey: Key.collapsed) }
-    }
-
-    static var didPlaceAlwaysHiddenDivider: Bool {
-        get { defaults.bool(forKey: "didPlaceAlwaysHiddenDivider") }
-        set { defaults.set(newValue, forKey: "didPlaceAlwaysHiddenDivider") }
-    }
-
-    static var didOnboard: Bool {
-        get { defaults.bool(forKey: Key.didOnboard) }
-        set { defaults.set(newValue, forKey: Key.didOnboard) }
+        static let autoRehide = "autoRehide"
+        static let didOnboard = "didOnboard"
+        static let legacyItemSections = "itemSections"
     }
 
     static var displayMode: DisplayMode {
@@ -71,43 +54,49 @@ enum Settings {
         set { defaults.set(newValue.rawValue, forKey: Key.displayMode) }
     }
 
-    /// The section each item was last seen in, for items whose frame can't tell right now.
-    static func section(forItem id: String) -> MenuBarSection? {
-        (defaults.dictionary(forKey: Key.sections)?[id] as? String).flatMap(MenuBarSection.init(rawValue:))
+    static var autoRehide: Bool {
+        get { defaults.object(forKey: Key.autoRehide) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.autoRehide) }
     }
 
-    static func setSections(_ sections: [String: MenuBarSection]) {
-        guard !sections.isEmpty else { return }
-        var stored = defaults.dictionary(forKey: Key.sections) ?? [:]
-        for (id, section) in sections {
-            stored[id] = section.rawValue
+    static var didOnboard: Bool {
+        get { defaults.bool(forKey: Key.didOnboard) }
+        set { defaults.set(newValue, forKey: Key.didOnboard) }
+    }
+
+    /// The section of every app the user placed; apps never placed are visible.
+    static var sections: [String: MenuBarSection] {
+        get {
+            let stored = defaults.dictionary(forKey: Key.sections) as? [String: String] ?? [:]
+            return stored.compactMapValues(MenuBarSection.init(rawValue:))
         }
-        defaults.set(stored, forKey: Key.sections)
+        set {
+            defaults.set(newValue.filter { $0.value != .visible }.mapValues(\.rawValue), forKey: Key.sections)
+        }
     }
 
-    /// Where a divider sat at its natural width the last time it was on screen, in AX coordinates.
-    ///
-    /// Hidden items keep reporting their last frame, so comparing against these
-    /// positions tells which section they belong to.
-    static func dividerMinX(_ divider: MenuBarSection) -> CGFloat? {
-        defaults.dictionary(forKey: Key.dividerMinX)?[divider.rawValue] as? CGFloat
+    static func section(forBundle bundle: String) -> MenuBarSection {
+        sections[bundle] ?? .visible
     }
 
-    static func setDividerMinX(_ value: CGFloat, for divider: MenuBarSection) {
-        var stored = defaults.dictionary(forKey: Key.dividerMinX) ?? [:]
-        stored[divider.rawValue] = value
-        defaults.set(stored, forKey: Key.dividerMinX)
+    static func setSection(_ section: MenuBarSection, forBundle bundle: String) {
+        sections[bundle] = section
     }
 
-    /// The leftmost x a collapsed divider can start at on a given screen, learned by fitting.
-    static func statusAreaMinX(screen key: String) -> CGFloat? {
-        defaults.dictionary(forKey: Key.statusAreaMinX)?[key] as? CGFloat
-    }
-
-    static func setStatusAreaMinX(_ value: CGFloat, screen key: String) {
-        var stored = defaults.dictionary(forKey: Key.statusAreaMinX) ?? [:]
-        stored[key] = value
-        defaults.set(stored, forKey: Key.statusAreaMinX)
+    /// Carries over sections from the divider-based builds, which stored them per item ("bundle/label").
+    static func migrateLegacySections() {
+        guard defaults.object(forKey: Key.sections) == nil,
+              let legacy = defaults.dictionary(forKey: Key.legacyItemSections) as? [String: String] else { return }
+        var migrated: [String: MenuBarSection] = [:]
+        for (itemID, raw) in legacy {
+            guard let bundle = itemID.split(separator: "/").first.map(String.init),
+                  let section = MenuBarSection(rawValue: raw), section != .visible else { continue }
+            migrated[bundle] = section
+        }
+        sections = migrated
+        for key in [Key.legacyItemSections, "dividerMinX", "statusAreaMinX", "didPlaceAlwaysHiddenDivider", "collapsed", "hidden", "barLayout"] {
+            defaults.removeObject(forKey: key)
+        }
     }
 
     static var launchesAtLogin: Bool {

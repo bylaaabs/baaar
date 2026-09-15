@@ -12,7 +12,7 @@ final class ItemImageCache {
 
     init() {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        directory = caches.appending(path: "com.aaangelmartin.baaar/items-v2", directoryHint: .isDirectory)
+        directory = caches.appending(path: "com.aaangelmartin.baaar/items-v3", directoryHint: .isDirectory)
     }
 
     func image(for item: MenuBarItem) -> NSImage? {
