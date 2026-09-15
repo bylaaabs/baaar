@@ -5,8 +5,10 @@ import Observation
 @MainActor
 @Observable
 final class AppModel {
-    /// One app with menu bar items. Sections apply per app: macOS hides and shows whole bundles.
+    /// One app, or one of Apple's system items, with menu bar items. Sections apply per app:
+    /// macOS hides and shows whole bundles.
     struct AppGroup: Identifiable, Equatable {
+        /// The app's bundle identifier, or `SystemItem.key` for Apple's system items.
         let bundleIdentifier: String
         let name: String
         let section: MenuBarSection
@@ -14,11 +16,14 @@ final class AppModel {
         let itemImages: [NSImage]
         /// The app's own icon, shown when no item image exists.
         let appIcon: NSImage?
+        /// Apple's system items (Clock, Wi-Fi, Control Center…) rather than an app.
+        let isSystem: Bool
 
         var id: String { bundleIdentifier }
 
         static func == (lhs: AppGroup, rhs: AppGroup) -> Bool {
-            lhs.bundleIdentifier == rhs.bundleIdentifier && lhs.section == rhs.section && lhs.itemImages.count == rhs.itemImages.count
+            lhs.bundleIdentifier == rhs.bundleIdentifier && lhs.name == rhs.name && lhs.section == rhs.section
+                && lhs.itemImages.elementsEqual(rhs.itemImages, by: ===) && lhs.appIcon === rhs.appIcon
         }
     }
 
@@ -32,9 +37,23 @@ final class AppModel {
 
     var displayMode: DisplayMode {
         didSet {
+            guard displayMode != oldValue else { return }
             Settings.displayMode = displayMode
             controller?.displayModeChanged()
         }
+    }
+
+    var chevronStyle: ChevronStyle {
+        didSet {
+            guard chevronStyle != oldValue else { return }
+            Settings.chevronStyle = chevronStyle
+            controller?.chevronStyleChanged()
+        }
+    }
+
+    /// The section apps and system items get the first time baaar sees them.
+    var newAppSection: MenuBarSection {
+        didSet { Settings.newAppSection = newAppSection }
     }
 
     var autoRehide: Bool {
@@ -52,6 +71,8 @@ final class AppModel {
 
     init() {
         displayMode = Settings.displayMode
+        chevronStyle = Settings.chevronStyle
+        newAppSection = Settings.newAppSection
         autoRehide = Settings.autoRehide
         launchesAtLogin = Settings.launchesAtLogin
     }

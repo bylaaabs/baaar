@@ -37,6 +37,101 @@ enum DisplayMode: String, CaseIterable, Sendable {
     }
 }
 
+/// Where the chevron points. It points where hidden items go: sideways into the menu bar, down into a panel.
+enum ChevronDirection: Sendable {
+    case left, right, down, up
+}
+
+/// The look of the chevron status item.
+enum ChevronStyle: String, CaseIterable, Sendable {
+    case chevron
+    case arrow
+    case triangle
+    case circle
+    case dots
+
+    var title: String {
+        switch self {
+        case .chevron: "Chevron"
+        case .arrow: "Arrow"
+        case .triangle: "Triangle"
+        case .circle: "Circle"
+        case .dots: "Dots"
+        }
+    }
+
+    /// SF Symbol for a direction. Dots don't point anywhere, so they fill in while open instead.
+    func symbolName(_ direction: ChevronDirection) -> String {
+        let way = switch direction {
+        case .left: "left"
+        case .right: "right"
+        case .down: "down"
+        case .up: "up"
+        }
+        return switch self {
+        case .chevron: "chevron.\(way)"
+        case .arrow: "arrow.\(way)"
+        case .triangle: "arrowtriangle.\(way).fill"
+        case .circle: "chevron.\(way).circle"
+        case .dots: direction == .left || direction == .down ? "ellipsis" : "ellipsis.circle.fill"
+        }
+    }
+}
+
+/// Apple's menu bar items that MenuBarAgent lets baaar keep or hide individually.
+///
+/// The raw values are MenuBarClientCore's `MBSystemItemIdentifier`, verified on macOS 27
+/// by withholding each one from the restriction and watching which item disappears.
+enum SystemItem: Int, CaseIterable, Sendable {
+    case battery = 0
+    case bluetooth = 1
+    case clock = 2
+    case displays = 3
+    case keyboard = 4
+    case sound = 5
+    case wifi = 6
+    case screenMirroring = 7
+    case controlCenter = 8
+
+    /// The key used in place of a bundle identifier wherever apps and system items mix.
+    var key: String {
+        "system.\(self)"
+    }
+
+    init?(key: String) {
+        guard let item = Self.allCases.first(where: { $0.key == key }) else { return nil }
+        self = item
+    }
+
+    var symbolName: String {
+        switch self {
+        case .battery: "battery.75percent"
+        case .bluetooth: "wave.3.right"
+        case .clock: "clock"
+        case .displays: "sun.max"
+        case .keyboard: "light.max"
+        case .sound: "speaker.wave.2.fill"
+        case .wifi: "wifi"
+        case .screenMirroring: "rectangle.on.rectangle"
+        case .controlCenter: "switch.2"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .battery: "Battery"
+        case .bluetooth: "Bluetooth"
+        case .clock: "Clock"
+        case .displays: "Displays"
+        case .keyboard: "Keyboard Brightness"
+        case .sound: "Sound"
+        case .wifi: "Wi-Fi"
+        case .screenMirroring: "Screen Mirroring"
+        case .controlCenter: "Control Center"
+        }
+    }
+}
+
 @MainActor
 enum Settings {
     private static let defaults = UserDefaults.standard
@@ -47,6 +142,23 @@ enum Settings {
         static let autoRehide = "autoRehide"
         static let didOnboard = "didOnboard"
         static let legacyItemSections = "itemSections"
+    }
+
+    static var chevronStyle: ChevronStyle {
+        get { defaults.string(forKey: "chevronStyle").flatMap(ChevronStyle.init(rawValue:)) ?? .chevron }
+        set { defaults.set(newValue.rawValue, forKey: "chevronStyle") }
+    }
+
+    /// The section apps get the first time baaar sees them.
+    static var newAppSection: MenuBarSection {
+        get { defaults.string(forKey: "newAppSection").flatMap(MenuBarSection.init(rawValue:)) ?? .visible }
+        set { defaults.set(newValue.rawValue, forKey: "newAppSection") }
+    }
+
+    /// Every app or system item key baaar has already placed, so new ones can go to `newAppSection`.
+    static var knownKeys: Set<String> {
+        get { Set(defaults.stringArray(forKey: "knownKeys") ?? []) }
+        set { defaults.set(Array(newValue).sorted(), forKey: "knownKeys") }
     }
 
     static var displayMode: DisplayMode {
@@ -64,14 +176,14 @@ enum Settings {
         set { defaults.set(newValue, forKey: Key.didOnboard) }
     }
 
-    /// The section of every app the user placed; apps never placed are visible.
+    /// The section of every app (bundle identifier) and system item (`SystemItem.key`) baaar has placed.
     static var sections: [String: MenuBarSection] {
         get {
             let stored = defaults.dictionary(forKey: Key.sections) as? [String: String] ?? [:]
             return stored.compactMapValues(MenuBarSection.init(rawValue:))
         }
         set {
-            defaults.set(newValue.filter { $0.value != .visible }.mapValues(\.rawValue), forKey: Key.sections)
+            defaults.set(newValue.mapValues(\.rawValue), forKey: Key.sections)
         }
     }
 

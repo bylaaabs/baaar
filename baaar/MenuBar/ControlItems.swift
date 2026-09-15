@@ -30,7 +30,6 @@ final class ControlItems {
         chevronItem.button?.target = self
         chevronItem.button?.action = #selector(chevronClicked)
         chevronItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
-        setRevealed(false, hasHiddenItems: true)
     }
 
     var screen: NSScreen? {
@@ -41,11 +40,12 @@ final class ControlItems {
         chevronItem.button?.effectiveAppearance
     }
 
-    /// The chevron points at where the hidden items go: left to show them, right to tuck them away.
-    func setRevealed(_ revealed: Bool, hasHiddenItems: Bool) {
-        let description = revealed ? "Hide menu bar items" : "Show hidden menu bar items"
-        chevronItem.button?.image = Self.symbol(revealed ? "chevron.right" : "chevron.left", description: description)
-        chevronItem.button?.appearsDisabled = !hasHiddenItems && !revealed
+    /// Shows the chevron in the chosen style, pointing where hidden items appear.
+    func setChevron(style: ChevronStyle, direction: ChevronDirection, hasHiddenItems: Bool) {
+        let isOpen = direction == .right || direction == .up
+        let description = isOpen ? "Hide menu bar items" : "Show hidden menu bar items"
+        chevronItem.button?.image = Self.symbol(style.symbolName(direction), description: description)
+        chevronItem.button?.appearsDisabled = !hasHiddenItems && !isOpen
     }
 
     @objc private func appClicked() {

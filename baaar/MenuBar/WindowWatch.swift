@@ -21,21 +21,18 @@ enum WindowWatch {
         }
     }
 
-    /// Menus and popovers of `pid` that weren't on screen in `baseline` and hang from the menu bar.
+    /// Menus and popovers that weren't on screen in `baseline` and hang from the top of a screen.
     ///
     /// Apps such as Canopy keep menu-level windows around all the time, so only new
-    /// windows touching the top of the screen count.
-    static func newPopups(of pid: pid_t, since baseline: Set<CGWindowID>) -> [Window] {
-        let reach = menuBarHeight + 80
+    /// windows count. Pass nil for `pid` to accept any owner: helper processes often own an item's menu.
+    static func newPopups(of pid: pid_t?, since baseline: Set<CGWindowID>, screenTop: CGFloat) -> [Window] {
+        let reach = screenTop + menuBarHeight + 80
+        let cursorLevel = Int(CGWindowLevelForKey(.cursorWindow))
         return onScreen().filter { window in
-            window.pid == pid && window.layer > 0 && !baseline.contains(window.id) && window.bounds.minY <= reach && window.bounds.height > 4
+            (pid == nil || window.pid == pid) && window.layer > 0 && window.layer < cursorLevel
+                && !baseline.contains(window.id) && window.bounds.minY <= reach && window.bounds.height > 4
+                && window.pid != ProcessInfo.processInfo.processIdentifier
         }
-    }
-
-    /// Menus from any app that appeared since `baseline`.
-    static func newMenus(since baseline: Set<CGWindowID>) -> [Window] {
-        let menuLevel = Int(CGWindowLevelForKey(.popUpMenuWindow))
-        return onScreen().filter { $0.layer >= menuLevel && $0.layer < Int(CGWindowLevelForKey(.cursorWindow)) && !baseline.contains($0.id) }
     }
 
     static func ids() -> Set<CGWindowID> {

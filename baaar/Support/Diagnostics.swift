@@ -25,9 +25,39 @@ enum Diagnostics {
             lines.append("\(item.id) pid=\(item.pid) label=\(item.label ?? "-") pressable=\(item.isPressable) frame=\(String(describing: item.frame))")
         }
 
+        lines.append("\n== MenuBarAgent tree")
+        lines += await menuBarAgentTree()
+
         let url = directory.appending(path: "diagnostics.txt")
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try? lines.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
         return url
+    }
+
+    /// Apple's items live in MenuBarAgent; dump three levels with roles and actions.
+    private nonisolated static func menuBarAgentTree() async -> [String] {
+        guard let agent = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.MenuBarAgent").first else { return ["no MenuBarAgent"] }
+        let pid = agent.processIdentifier
+        return await Task.detached {
+            var lines: [String] = []
+            func walk(_ element: AXUIElement, depth: Int) {
+                let role: String = AX.value(element, kAXRoleAttribute) ?? "?"
+                let subrole: String = AX.value(element, kAXSubroleAttribute) ?? ""
+                let label = [kAXTitleAttribute, kAXDescriptionAttribute, kAXIdentifierAttribute, kAXHelpAttribute, kAXValueAttribute]
+                    .compactMap { (AX.value(element, $0) as String?)?.nilIfEmpty.map { "\($0.dropFirst(2))=\($0)" } }
+                    .joined(separator: " ")
+                lines.append(String(repeating: "  ", count: depth) + "\(role) \(subrole) \(label) frame=\(String(describing: AX.frame(element))) actions=\(AX.actions(element))")
+                guard depth < 4 else { return }
+                for child in (AX.value(element, kAXChildrenAttribute) as [AXUIElement]?) ?? [] {
+                    walk(child, depth: depth + 1)
+                }
+            }
+            let app = AXUIElementCreateApplication(pid)
+            AXUIElementSetMessagingTimeout(app, 0.5)
+            if let extras: AXUIElement = AX.value(app, "AXExtrasMenuBar") {
+                walk(extras, depth: 0)
+            }
+            return lines
+        }.value
     }
 }

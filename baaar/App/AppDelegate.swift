@@ -22,6 +22,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.bar.close()
             self?.controller.activate(item)
         }
+        bar.onClose = { [weak self] in
+            self?.controller.isPanelOpen = false
+        }
 
         #if DEBUG
         listenForDebugCommands()
@@ -38,21 +41,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !Permissions.hasAccessibility {
             Permissions.requestAccessibility()
         }
+        if !VisibilityRestriction.isAvailable {
+            Log.write("MenuBarAgent's visibility restriction is unavailable; items can't be hidden")
+        }
         Task {
-            // Let apps publish their items and picture them while they are all on screen, then hide.
-            try? await Task.sleep(for: .seconds(1))
-            await controller.captureVisibleItems()
-            controller.setReveal(.none)
-            if await controller.hasItemsWithoutImages() {
-                await controller.refreshImages()
+            await controller.refreshSnapshot()
+            // Hide right away when every hidden item already has a picture; otherwise picture them first.
+            if await controller.hasHiddenItemsWithoutImages() {
+                await controller.captureVisibleItems()
+                controller.setReveal(.none)
+                await controller.refreshImages(onlyMissing: true)
+            } else {
+                controller.setReveal(.none)
             }
             if !Settings.didOnboard {
                 Settings.didOnboard = true
                 settingsWindow.show(pane: .layout)
             }
-        }
-        if !VisibilityRestriction.isAvailable {
-            Log.write("MenuBarAgent's visibility restriction is unavailable; items can't be hidden")
         }
     }
 
@@ -92,36 +97,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             controller.setReveal(.none)
             return
         }
-        guard Permissions.hasAccessibility else {
-            settingsWindow.show(pane: .permissions)
-            return
-        }
         let includeAlwaysHidden = event?.type == .leftMouseUp && event?.modifierFlags.contains(.option) == true
+        showHiddenItems(includeAlwaysHidden: includeAlwaysHidden)
+    }
+
+    /// Shows hidden items the way the user chose: in place, or in a bar, list or grid.
+    private func showHiddenItems(includeAlwaysHidden: Bool) {
         switch Settings.displayMode {
         case .menuBar:
             controller.setReveal(includeAlwaysHidden ? .all : .hidden)
             controller.startRehideMonitor()
         case .bar, .list, .grid:
-            Task { await openPanel(includeAlwaysHidden: includeAlwaysHidden) }
+            guard Permissions.hasAccessibility else {
+                settingsWindow.show(pane: .permissions)
+                return
+            }
+            openPanel(includeAlwaysHidden: includeAlwaysHidden)
         }
     }
 
     // MARK: - Panel
 
-    private func openPanel(includeAlwaysHidden: Bool) async {
+    /// Opens straight from the last scan, then refreshes it in the background.
+    private func openPanel(includeAlwaysHidden: Bool) {
         let sections: Set<MenuBarSection> = includeAlwaysHidden ? [.hidden, .alwaysHidden] : [.hidden]
-        let items = await controller.items(in: sections)
-        let anchor = await ownItemFrame(ControlItems.Identifier.chevron)
-        let entries = items.map { BarEntry(item: $0, image: controller.images.image(for: $0)) }
-        let message = entries.isEmpty ? "Nothing hidden yet — open Settings › Layout to hide apps" : nil
-        bar.show(entries: entries, message: message, mode: Settings.displayMode, anchor: anchor, screen: controls.screen, appearance: controls.menuBarAppearance)
+        presentPanel(items: controller.items(in: sections), snapshot: controller.snapshot)
+        Task {
+            let fresh = await controller.refreshSnapshot()
+            let items = controller.items(in: sections, from: fresh)
+            guard bar.isVisible, items.map(\.id) != bar.shownItemIDs else { return }
+            presentPanel(items: items, snapshot: fresh)
+        }
     }
 
-    /// One of baaar's own status items, in AppKit screen coordinates.
-    private func ownItemFrame(_ identifier: String) async -> CGRect? {
-        let ownPID = ProcessInfo.processInfo.processIdentifier
-        let snapshot = await ItemScanner.scan(pids: [ownPID])
-        guard let frame = snapshot.items.first(where: { $0.id.hasSuffix("/\(identifier)") })?.frame,
+    private func presentPanel(items: [MenuBarItem], snapshot: MenuBarSnapshot) {
+        let entries = items.map { BarEntry(item: $0, image: controller.images.image(for: $0)) }
+        let message = entries.isEmpty ? "Nothing hidden yet - open Settings to hide items" : nil
+        bar.show(entries: entries, message: message, mode: Settings.displayMode, anchor: Self.ownFrame(ControlItems.Identifier.chevron, in: snapshot), screen: controls.screen, appearance: controls.menuBarAppearance)
+        controller.isPanelOpen = true
+    }
+
+    /// One of baaar's own status items in AppKit screen coordinates, from a scan.
+    private static func ownFrame(_ identifier: String, in snapshot: MenuBarSnapshot) -> CGRect? {
+        guard let frame = snapshot.items.first(where: { $0.isOwn && $0.identifier == identifier })?.frame,
               let primaryHeight = NSScreen.screens.first?.frame.height else { return nil }
         return CGRect(x: frame.minX, y: primaryHeight - frame.maxY, width: frame.width, height: frame.height)
     }
@@ -150,13 +168,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         addItem(to: menu, "Quit baaar", #selector(NSApplication.terminate(_:)), key: "q").target = NSApp
 
-        Task {
-            guard let anchor = await ownItemFrame(identifier), let screen = controls.screen else { return }
-            // With no view the location is in screen coordinates and marks the menu's top-left corner.
-            // It must sit below the menu bar, or AppKit clips the menu and adds a scroll arrow.
-            let top = min(anchor.minY, screen.visibleFrame.maxY) - 2
-            menu.popUp(positioning: nil, at: NSPoint(x: anchor.midX - menu.size.width / 2, y: top), in: nil)
+        guard let anchor = Self.ownFrame(identifier, in: controller.snapshot), let screen = controls.screen else {
+            if let button = (identifier == ControlItems.Identifier.app ? controls.appItem : controls.chevronItem).button {
+                menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.maxY + 4), in: button)
+            }
+            return
         }
+        // With no view the location is in screen coordinates and marks the menu's top-left corner.
+        // It must sit below the menu bar, or AppKit clips the menu and adds a scroll arrow.
+        let top = min(anchor.minY, screen.visibleFrame.maxY) - 2
+        menu.popUp(positioning: nil, at: NSPoint(x: anchor.midX - menu.size.width / 2, y: top), in: nil)
     }
 
     @discardableResult
@@ -167,13 +188,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func menuShowHidden() {
-        controller.setReveal(.hidden)
-        controller.startRehideMonitor()
+        showHiddenItems(includeAlwaysHidden: false)
     }
 
     @objc private func menuShowAll() {
-        controller.setReveal(.all)
-        controller.startRehideMonitor()
+        showHiddenItems(includeAlwaysHidden: true)
     }
 
     @objc private func menuHide() {
@@ -206,7 +225,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 app.controller.setReveal(reveal)
             },
             "chevron": { app, _ in app.chevronClicked(nil) },
-            "panel": { app, argument in await app.openPanel(includeAlwaysHidden: argument == "all") },
+            "showall": { app, _ in app.menuShowAll() },
+            "panel": { app, argument in app.openPanel(includeAlwaysHidden: argument == "all") },
             "close": { app, _ in app.bar.close() },
             "menu": { app, argument in app.showMenu(under: argument == "app" ? ControlItems.Identifier.app : ControlItems.Identifier.chevron) },
             "mode": { app, argument in app.model.displayMode = DisplayMode(rawValue: argument ?? "") ?? .bar },
@@ -219,7 +239,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 app.controller.setSection(section, forBundle: parts[0])
             },
             "press": { app, bundleID in
-                let item = await ItemScanner.scan().items.first { $0.bundleIdentifier == bundleID && $0.isManageable }
+                let item = await ItemScanner.scan().items.first { ($0.bundleIdentifier == bundleID || $0.id == bundleID) && $0.isManageable }
                 if let item { app.controller.activate(item) }
             },
             "clickentry": { app, argument in

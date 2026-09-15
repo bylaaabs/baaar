@@ -1,10 +1,10 @@
 import AppKit
 
-/// How much of the menu bar is showing.
+/// How much of the menu bar is showing in place.
 enum Reveal: Int, Comparable {
-    /// Hidden and always-hidden apps are concealed.
+    /// Hidden and always-hidden items are concealed.
     case none
-    /// Only always-hidden apps are concealed.
+    /// Only always-hidden items are concealed.
     case hidden
     /// Nothing is concealed.
     case all
@@ -14,54 +14,91 @@ enum Reveal: Int, Comparable {
     }
 }
 
-/// Drives the real menu bar: which apps are concealed, opening hidden items, and picturing items.
+/// Drives the real menu bar: which items are concealed, opening hidden items, and picturing items.
 ///
 /// Every change is a new restriction handed to MenuBarAgent, which applies it at
-/// once, so there is no long-running state to get stuck in and nothing touches the cursor.
+/// once, so nothing touches the cursor. Temporary changes (opening an item,
+/// picturing hidden ones) belong to one task at a time: starting another, or any
+/// user action, cancels it and puts the sections back.
 @MainActor
 final class MenuBarController {
     let controls: ControlItems
     let images = ItemImageCache()
     private let restriction = VisibilityRestriction()
 
-    private(set) var reveal: Reveal = .all
-    /// Apps shown for a moment, e.g. the one whose item is being opened.
-    private var temporarilyAllowed: Set<String> = []
-    /// Apps concealed for a moment on top of the sections, to make room or to picture others.
-    private var temporarilyConcealed: Set<String> = []
+    private(set) var reveal: Reveal = .none
+    /// Whether a bar, list or grid is showing, so the chevron can point back up.
+    var isPanelOpen = false {
+        didSet { updateChevron() }
+    }
 
-    private var activation: Task<Void, Never>?
+    /// Keys shown or hidden on top of the sections by the current temporary task.
+    private var temporarilyAllowed: Set<String> = []
+    private var temporarilyConcealed: Set<String> = []
+    private var temporaryTask: Task<Void, Never>?
+    private var temporaryGeneration = 0
+
     private var rehide: RehideMonitor?
-    private var appObservers: [NSObjectProtocol] = []
+    private(set) var snapshot = MenuBarSnapshot(items: [])
+    private var snapshotTask: Task<MenuBarSnapshot, Never>?
+    private var captureFailures: [String: Date] = [:]
+    /// Items as last seen, so the bar still lists Apple's items after MenuBarAgent drops concealed ones from AX.
+    private var lastSeen: [String: MenuBarItem] = [:]
+
+    private var clockMonitor: Any?
 
     init(controls: ControlItems) {
         self.controls = controls
-        let center = NSWorkspace.shared.notificationCenter
-        for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
-            appObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                // A restriction allows the apps running when it was issued; newcomers need a fresh one.
-                MainActor.assumeIsolated { self?.restriction.refreshAllowedApps() }
-            })
+        updateChevron()
+        watchClockClicks()
+        // Keep a recent picture of the menu bar so the bar opens instantly.
+        Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.refreshSnapshot()
+                try? await Task.sleep(for: .seconds(5))
+            }
         }
     }
 
     // MARK: - Sections
 
-    func bundles(in sections: Set<MenuBarSection>) -> Set<String> {
+    func keys(in sections: Set<MenuBarSection>) -> Set<String> {
         Set(Settings.sections.filter { sections.contains($0.value) }.keys)
     }
 
-    func setSection(_ section: MenuBarSection, forBundle bundle: String) {
-        Settings.setSection(section, forBundle: bundle)
+    func section(of item: MenuBarItem) -> MenuBarSection {
+        item.sectionKey.map(Settings.section(forBundle:)) ?? .visible
+    }
+
+    func setSection(_ section: MenuBarSection, forBundle key: String) {
+        Settings.setSection(section, forBundle: key)
+        Settings.knownKeys.insert(key)
+        apply()
+    }
+
+    /// Places apps and system items seen for the first time in the section chosen for new apps.
+    private func placeNewItems(in snapshot: MenuBarSnapshot) {
+        let seen = Set(snapshot.items.filter(\.isManageable).compactMap(\.sectionKey))
+        var known = Settings.knownKeys
+        let isFirstRun = known.isEmpty
+        let newcomers = seen.subtracting(known)
+        guard !newcomers.isEmpty else { return }
+        known.formUnion(newcomers)
+        Settings.knownKeys = known
+        // On the first run everything already in the menu bar stays where it is.
+        guard !isFirstRun, Settings.newAppSection != .visible else { return }
+        var sections = Settings.sections
+        for key in newcomers where sections[key] == nil {
+            sections[key] = Settings.newAppSection
+        }
+        Settings.sections = sections
         apply()
     }
 
     // MARK: - Reveal
 
     func setReveal(_ target: Reveal) {
-        activation?.cancel()
-        temporarilyAllowed = []
-        temporarilyConcealed = []
+        endTemporaryState()
         reveal = target
         apply()
         if target == .none {
@@ -81,125 +118,263 @@ final class MenuBarController {
         setReveal(.none)
     }
 
+    func chevronStyleChanged() {
+        updateChevron()
+    }
+
     private func apply() {
         var concealed: Set<String> = switch reveal {
-        case .none: bundles(in: [.hidden, .alwaysHidden])
-        case .hidden: bundles(in: [.alwaysHidden])
+        case .none: keys(in: [.hidden, .alwaysHidden])
+        case .hidden: keys(in: [.alwaysHidden])
         case .all: []
         }
         concealed.formUnion(temporarilyConcealed)
         concealed.subtract(temporarilyAllowed)
         restriction.conceal(concealed)
-        controls.setRevealed(reveal != .none, hasHiddenItems: !bundles(in: [.hidden, .alwaysHidden]).isEmpty)
+        updateChevron()
+    }
+
+    private func updateChevron() {
+        let isShowing = reveal != .none || isPanelOpen
+        let direction: ChevronDirection = switch Settings.displayMode {
+        case .menuBar: isShowing ? .right : .left
+        case .bar, .list, .grid: isShowing ? .up : .down
+        }
+        controls.setChevron(style: Settings.chevronStyle, direction: direction, hasHiddenItems: !keys(in: [.hidden, .alwaysHidden]).isEmpty)
+    }
+
+    // MARK: - Temporary state
+
+    /// Runs a temporary change to the restriction; the sections come back when it ends or is cancelled.
+    private func runTemporary(_ work: @escaping @MainActor (_ isCurrent: @escaping @MainActor () -> Bool) async -> Void) {
+        endTemporaryState()
+        temporaryGeneration += 1
+        let generation = temporaryGeneration
+        temporaryTask = Task { [weak self] in
+            await work { [weak self] in self?.temporaryGeneration == generation && !Task.isCancelled }
+            guard let self, self.temporaryGeneration == generation else { return }
+            self.temporarilyAllowed = []
+            self.temporarilyConcealed = []
+            self.temporaryTask = nil
+            self.apply()
+        }
+    }
+
+    private func endTemporaryState() {
+        temporaryTask?.cancel()
+        temporaryTask = nil
+        temporaryGeneration += 1
+        if !temporarilyAllowed.isEmpty || !temporarilyConcealed.isEmpty {
+            temporarilyAllowed = []
+            temporarilyConcealed = []
+            apply()
+        }
     }
 
     // MARK: - Items
 
-    /// Items of apps in the given sections that are running, in menu bar order.
-    func items(in sections: Set<MenuBarSection>) async -> [MenuBarItem] {
-        let bundles = bundles(in: sections)
-        return await ItemScanner.scan().items.filter { item in
-            item.isManageable && bundles.contains(item.bundleIdentifier ?? "")
+    /// A fresh menu bar scan, shared by callers that ask at the same time.
+    @discardableResult
+    func refreshSnapshot() async -> MenuBarSnapshot {
+        if let snapshotTask {
+            return await snapshotTask.value
+        }
+        let task = Task { await ItemScanner.scan() }
+        snapshotTask = task
+        let fresh = await task.value
+        snapshotTask = nil
+        snapshot = fresh
+        remember(fresh)
+        placeNewItems(in: fresh)
+        return fresh
+    }
+
+    private func remember(_ snapshot: MenuBarSnapshot) {
+        let current = Set(snapshot.items.map(\.id))
+        for item in snapshot.items where item.isManageable {
+            lastSeen[item.id] = item
+        }
+        lastSeen = lastSeen.filter { id, item in
+            guard !current.contains(id) else { return true }
+            // Keep items missing only because they're concealed, as long as their owner still runs.
+            guard let key = item.sectionKey, restriction.concealedKeys.contains(key) else { return false }
+            return NSRunningApplication(processIdentifier: item.pid) != nil
         }
     }
 
-    /// Every running app with items, for the layout editor.
+    /// The scan's manageable items plus concealed ones it no longer reports, in menu bar order.
+    private func manageableItems(in snapshot: MenuBarSnapshot) -> [MenuBarItem] {
+        let present = Set(snapshot.items.map(\.id))
+        let missing = lastSeen.values.filter { !present.contains($0.id) }
+        return (snapshot.items.filter(\.isManageable) + missing).sorted { ($0.frame?.minX ?? 0) < ($1.frame?.minX ?? 0) }
+    }
+
+    /// Items in the given sections, in menu bar order, from the cached scan unless another is given.
+    func items(in sections: Set<MenuBarSection>, from snapshot: MenuBarSnapshot? = nil) -> [MenuBarItem] {
+        manageableItems(in: snapshot ?? self.snapshot).filter { sections.contains(section(of: $0)) }
+    }
+
+    /// Every app and system item in the menu bar, for the layout editor.
     func appGroups() async -> [AppModel.AppGroup] {
-        let snapshot = await ItemScanner.scan()
+        let snapshot = await refreshSnapshot()
         var order: [String] = []
-        var itemsByBundle: [String: [MenuBarItem]] = [:]
-        for item in snapshot.items where item.isManageable {
-            guard let bundle = item.bundleIdentifier else { continue }
-            if itemsByBundle[bundle] == nil {
-                order.append(bundle)
+        var itemsByKey: [String: [MenuBarItem]] = [:]
+        for item in manageableItems(in: snapshot) {
+            guard let key = item.sectionKey else { continue }
+            if itemsByKey[key] == nil {
+                order.append(key)
             }
-            itemsByBundle[bundle, default: []].append(item)
+            itemsByKey[key, default: []].append(item)
         }
-        return order.compactMap { bundle in
-            guard let items = itemsByBundle[bundle], let first = items.first else { return nil }
+        return order.compactMap { key in
+            guard let items = itemsByKey[key], let first = items.first else { return nil }
             return AppModel.AppGroup(
-                bundleIdentifier: bundle,
+                bundleIdentifier: key,
                 name: first.displayName,
-                section: Settings.section(forBundle: bundle),
+                section: Settings.section(forBundle: key),
                 itemImages: items.compactMap { images.image(for: $0) },
-                appIcon: first.appIcon
+                appIcon: first.appIcon,
+                isSystem: first.systemItem != nil
             )
         }
     }
 
     // MARK: - Opening an item
 
-    /// Opens an item from the bar: shows its app for a moment so the item is drawn in the
-    /// menu bar, presses it so its menu opens under it, and conceals it again once the menu closes.
+    /// Opens an item from the bar: shows it for a moment so it is drawn in the menu bar,
+    /// presses it so its menu opens under it, and conceals it again once the menu closes.
     func activate(_ item: MenuBarItem) {
-        activation?.cancel()
-        activation = Task { [weak self] in
-            await self?.performActivation(of: item)
+        runTemporary { [weak self] isCurrent in
+            await self?.performActivation(of: item, isCurrent: isCurrent)
         }
     }
 
-    private func performActivation(of item: MenuBarItem) async {
-        guard let bundle = item.bundleIdentifier else { return }
-        let wasConcealed = restriction.concealedBundles.contains(bundle)
+    private func performActivation(of item: MenuBarItem, isCurrent: @escaping @MainActor () -> Bool) async {
+        guard let key = item.sectionKey else { return }
+        if item.systemItem == .clock {
+            await openNotificationCenter(pressClock: true, isCurrent: isCurrent)
+            return
+        }
         var target = item
-        if wasConcealed {
-            temporarilyAllowed = [bundle]
+        if restriction.concealedKeys.contains(key) {
+            temporarilyAllowed = [key]
             apply()
-            if let shown = await waitUntilOnScreen(item.id) {
+            if let shown = await waitUntilOnScreen(item.id, isCurrent: isCurrent) {
                 target = shown
-            } else if !Task.isCancelled {
-                // No room next to the visible items: conceal the other apps for as long as the menu is open.
-                let others = Set((await ItemScanner.scan()).items.compactMap(\.bundleIdentifier)).subtracting([bundle])
-                temporarilyConcealed = others
+            } else if isCurrent() {
+                // No room next to the visible items: conceal everything else while the menu is open.
+                temporarilyConcealed = Set(snapshot.items.filter(\.isManageable).compactMap(\.sectionKey)).subtracting([key])
                 apply()
-                target = await waitUntilOnScreen(item.id) ?? item
+                target = await waitUntilOnScreen(item.id, isCurrent: isCurrent) ?? item
             }
         }
-        guard !Task.isCancelled else { return }
+        guard isCurrent() else { return }
 
         let baseline = WindowWatch.ids()
-        AX.press(target.element, id: target.id)
-        await waitWhilePopupOpen(of: target.pid, baseline: baseline)
-        guard !Task.isCancelled else { return }
-        temporarilyAllowed = []
-        temporarilyConcealed = []
-        apply()
+        let screenTop = Self.screenTop(for: target.frame)
+        let pressState = PressState()
+        let element = target.element
+        let id = target.id
+        Task.detached {
+            await AX.press(element, id: id)
+            await pressState.finish()
+        }
+        await waitWhileOpen(pid: target.pid, baseline: baseline, screenTop: screenTop, pressState: pressState, isCurrent: isCurrent)
     }
 
     /// Polls until the item is drawn in the menu bar, for up to two seconds.
-    private func waitUntilOnScreen(_ id: String) async -> MenuBarItem? {
-        for _ in 0..<14 {
-            try? await Task.sleep(for: .milliseconds(150))
-            guard !Task.isCancelled else { return nil }
+    private func waitUntilOnScreen(_ id: String, isCurrent: @MainActor () -> Bool) async -> MenuBarItem? {
+        var previousFrame: CGRect?
+        for attempt in 0..<16 {
+            try? await Task.sleep(for: .milliseconds(125))
+            guard isCurrent() else { return nil }
             let snapshot = await ItemScanner.scan()
-            if let item = snapshot.item(id: id), snapshot.isOnScreen(item, concealed: restriction.concealedBundles) {
-                // One more beat so the menu bar has finished sliding items into place.
-                try? await Task.sleep(for: .milliseconds(120))
-                return (await ItemScanner.scan()).item(id: id) ?? item
+            guard let item = snapshot.item(id: id) else { continue }
+            if snapshot.isOnScreen(item, concealed: restriction.concealedKeys) {
+                // Settled once the frame holds still between two scans.
+                if item.frame == previousFrame { return item }
+                previousFrame = item.frame
+            } else if attempt >= 3, snapshot.overflowButtonFrame != nil {
+                // macOS put it in its own overflow: there's no room.
+                return nil
             }
         }
         return nil
     }
 
-    /// Waits while the app shows a new menu or popover, for up to two minutes.
-    private func waitWhilePopupOpen(of pid: pid_t, baseline: Set<CGWindowID>) async {
-        // Give the menu a moment to appear; apps that open a window instead return right away.
+    /// Waits while the pressed item's menu or popover is open, for up to two minutes.
+    ///
+    /// A menu keeps `AXPress` from returning until it closes; a popover returns at once
+    /// but leaves a new window hanging from the menu bar. Either keeps the item out.
+    private func waitWhileOpen(pid: pid_t, baseline: Set<CGWindowID>, screenTop: CGFloat, pressState: PressState, isCurrent: @MainActor () -> Bool) async {
         var sawPopup = false
-        for _ in 0..<8 where !sawPopup {
-            try? await Task.sleep(for: .milliseconds(100))
-            sawPopup = !WindowWatch.newPopups(of: pid, since: baseline).isEmpty
+        var quietChecks = 0
+        for tick in 0..<(120 * 5) {
+            try? await Task.sleep(for: .milliseconds(200))
+            guard isCurrent() else { return }
+            let pressReturned = await pressState.isFinished
+            // Menus of helper processes belong to another pid, so any new window hanging from the bar counts.
+            if !WindowWatch.newPopups(of: nil, since: baseline, screenTop: screenTop).isEmpty {
+                sawPopup = true
+                quietChecks = 0
+                continue
+            }
+            if pressReturned {
+                // Nothing opened within 1.5 s: it opened a window or did its thing silently.
+                if !sawPopup, tick >= 7 { return }
+                quietChecks += 1
+                if sawPopup, quietChecks >= 2 { return }
+            }
         }
-        guard sawPopup else {
+    }
+
+    // MARK: - Notification Center
+
+    /// While any restriction is active MenuBarAgent won't open Notification Center from the clock,
+    /// so a click on the clock lifts the restriction until Notification Center closes.
+    private func watchClockClicks() {
+        clockMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
+            let location = NSEvent.mouseLocation
+            MainActor.assumeIsolated {
+                guard let self, !self.restriction.concealedKeys.isEmpty, self.temporaryTask == nil,
+                      let clock = self.snapshot.items.first(where: { $0.systemItem == .clock })?.frame,
+                      let primaryHeight = NSScreen.screens.first?.frame.height,
+                      clock.contains(CGPoint(x: location.x, y: primaryHeight - location.y)) else { return }
+                self.runTemporary { [weak self] isCurrent in
+                    await self?.openNotificationCenter(pressClock: false, isCurrent: isCurrent)
+                }
+            }
+        }
+    }
+
+    private func openNotificationCenter(pressClock: Bool, isCurrent: @escaping @MainActor () -> Bool) async {
+        temporarilyAllowed = restriction.concealedKeys
+        apply()
+        let center = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.notificationcenterui").first?.processIdentifier
+        func isOpen() -> Bool {
+            guard let center else { return false }
+            return WindowWatch.onScreen().contains { $0.pid == center && $0.layer > 0 && $0.bounds.width > 200 }
+        }
+        // The user's own click reaches MenuBarAgent once the restriction is gone; only press when it didn't open.
+        try? await Task.sleep(for: .milliseconds(pressClock ? 150 : 450))
+        guard isCurrent() else { return }
+        if !isOpen() {
+            if let clock = (await ItemScanner.scan()).items.first(where: { $0.systemItem == .clock }) {
+                await AX.press(clock.element, id: clock.id)
+            }
             try? await Task.sleep(for: .milliseconds(400))
-            return
         }
-        var closedChecks = 0
         for _ in 0..<(120 * 4) {
+            guard isCurrent(), isOpen() else { return }
             try? await Task.sleep(for: .milliseconds(250))
-            guard !Task.isCancelled else { return }
-            closedChecks = WindowWatch.newPopups(of: pid, since: baseline).isEmpty ? closedChecks + 1 : 0
-            if closedChecks >= 2 { return }
         }
+    }
+
+    private static func screenTop(for frame: CGRect?) -> CGFloat {
+        guard let frame, let primaryHeight = NSScreen.screens.first?.frame.height,
+              let screen = NSScreen.screens.first(where: { $0.frame.contains(CGPoint(x: frame.midX, y: primaryHeight - frame.midY)) })
+        else { return 0 }
+        return primaryHeight - screen.frame.maxY
     }
 
     // MARK: - Pictures
@@ -207,57 +382,71 @@ final class MenuBarController {
     /// Captures the items drawn right now.
     func captureVisibleItems() async {
         guard Permissions.hasScreenRecording else { return }
-        let snapshot = await ItemScanner.scan()
-        await images.capture(snapshot.items.filter { $0.isManageable && snapshot.isOnScreen($0, concealed: restriction.concealedBundles) })
+        let snapshot = await refreshSnapshot()
+        await images.capture(snapshot.items.filter { $0.isManageable && snapshot.isOnScreen($0, concealed: restriction.concealedKeys) })
     }
 
-    /// Captures every item, hidden ones included, without touching the cursor: other apps are
-    /// concealed for a moment so the hidden ones get drawn, a few apps at a time.
-    func refreshImages() async {
-        guard Permissions.hasScreenRecording, Permissions.hasAccessibility else { return }
-        activation?.cancel()
-        await captureVisibleItems()
-
-        let snapshot = await ItemScanner.scan()
-        let concealed = restriction.concealedBundles
-        let missing = snapshot.items.filter { $0.isManageable && !snapshot.isOnScreen($0, concealed: concealed) }
-        guard !missing.isEmpty else { return }
-        let allBundles = Set(snapshot.items.filter(\.isManageable).compactMap(\.bundleIdentifier))
-        let screenWidth = controls.screen?.frame.width ?? 1440
-
-        for batch in Self.batches(of: missing, maxWidth: screenWidth * 0.3) {
-            let shown = Set(batch.compactMap(\.bundleIdentifier))
-            temporarilyAllowed = shown
-            temporarilyConcealed = allBundles.subtracting(shown)
-            apply()
-            try? await Task.sleep(for: .milliseconds(700))
-            let current = await ItemScanner.scan()
-            let drawn = current.items.filter { shown.contains($0.bundleIdentifier ?? "") && current.isOnScreen($0, concealed: restriction.concealedBundles) }
-            await images.capture(drawn)
-        }
-        temporarilyAllowed = []
-        temporarilyConcealed = []
-        apply()
-    }
-
-    /// Whether some running item has never been pictured.
-    func hasItemsWithoutImages() async -> Bool {
+    /// Whether a hidden item has never been pictured and hasn't failed recently.
+    func hasHiddenItemsWithoutImages() async -> Bool {
         guard Permissions.hasScreenRecording else { return false }
-        return await ItemScanner.scan().items.contains { $0.isManageable && images.image(for: $0) == nil }
+        return !missingImages(in: await refreshSnapshot()).isEmpty
     }
 
-    /// Groups items by app into batches narrow enough to fit in the menu bar together.
-    private static func batches(of items: [MenuBarItem], maxWidth: CGFloat) -> [[MenuBarItem]] {
-        var byBundle: [String: [MenuBarItem]] = [:]
+    private func missingImages(in snapshot: MenuBarSnapshot) -> [MenuBarItem] {
+        items(in: [.hidden, .alwaysHidden], from: snapshot).filter { item in
+            images.image(for: item) == nil && (captureFailures[item.id].map { Date().timeIntervalSince($0) > 3600 } ?? true)
+        }
+    }
+
+    /// Captures hidden items without touching the cursor: everything else is concealed
+    /// for a moment so the hidden ones get drawn, a few at a time.
+    func refreshImages(onlyMissing: Bool = false) async {
+        guard Permissions.hasScreenRecording, Permissions.hasAccessibility else { return }
+        await captureVisibleItems()
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            runTemporary { [weak self] isCurrent in
+                await self?.performRefresh(onlyMissing: onlyMissing, isCurrent: isCurrent)
+                continuation.resume()
+            }
+        }
+    }
+
+    private func performRefresh(onlyMissing: Bool, isCurrent: @MainActor () -> Bool) async {
+        let snapshot = await refreshSnapshot()
+        let targets = onlyMissing ? missingImages(in: snapshot) : items(in: [.hidden, .alwaysHidden], from: snapshot)
+        guard !targets.isEmpty else { return }
+        let everything = Set(snapshot.items.filter(\.isManageable).compactMap(\.sectionKey))
+
+        for batch in batches(of: targets) {
+            guard isCurrent() else { return }
+            let shown = Set(batch.compactMap(\.sectionKey))
+            temporarilyAllowed = shown
+            temporarilyConcealed = everything.subtracting(shown)
+            apply()
+            try? await Task.sleep(for: .milliseconds(650))
+            guard isCurrent() else { return }
+            let current = await ItemScanner.scan()
+            await images.capture(current.items.filter { shown.contains($0.sectionKey ?? "") && current.isOnScreen($0, concealed: restriction.concealedKeys) })
+            for item in batch where images.image(for: item) == nil {
+                captureFailures[item.id] = Date()
+            }
+        }
+    }
+
+    /// Groups items into batches narrow enough to fit next to the notch.
+    private func batches(of items: [MenuBarItem]) -> [[MenuBarItem]] {
+        let screen = controls.screen
+        let available = max((screen?.auxiliaryTopRightArea?.width ?? (screen?.frame.width ?? 1440) / 2) - 220, 120)
+        var byKey: [String: [MenuBarItem]] = [:]
         for item in items {
-            byBundle[item.bundleIdentifier ?? "", default: []].append(item)
+            byKey[item.sectionKey ?? "", default: []].append(item)
         }
         var batches: [[MenuBarItem]] = []
         var current: [MenuBarItem] = []
         var width: CGFloat = 0
-        for group in byBundle.values {
-            let groupWidth = group.reduce(0) { $0 + ($1.frame?.width ?? 40) + 8 }
-            if !current.isEmpty, width + groupWidth > maxWidth {
+        for group in byKey.values {
+            let groupWidth = group.reduce(0) { $0 + ($1.frame?.width ?? 40) + 10 }
+            if !current.isEmpty, width + groupWidth > available {
                 batches.append(current)
                 current = []
                 width = 0
@@ -272,21 +461,31 @@ final class MenuBarController {
     }
 }
 
-/// Ice-style smart rehide: a click on another app's window, or 15 seconds with the pointer away from the menu bar.
+/// Whether a background `AXPress` has returned.
+private actor PressState {
+    private(set) var isFinished = false
+
+    func finish() {
+        isFinished = true
+    }
+}
+
+/// Ice-style smart rehide: a click outside the menu bar that isn't in a menu or popover,
+/// or 15 seconds with the pointer away from the menu bar and nothing open.
 @MainActor
 private final class RehideMonitor {
     private var monitor: Any?
     private var timer: Timer?
     private var awaySince: Date?
-    private let menuBaseline = WindowWatch.ids()
+    private var baseline = WindowWatch.ids()
 
     init(onRehide: @escaping @MainActor () -> Void) {
-        monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { event in
+        monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { _ in
             let location = NSEvent.mouseLocation
             MainActor.assumeIsolated {
-                guard !Self.isInMenuBar(location), let window = WindowWatch.window(at: location) else { return }
-                // Clicks inside menus and popovers keep the items out; clicks on app windows or the desktop don't.
-                if window.layer <= 0 {
+                guard !Self.isInMenuBar(location) else { return }
+                // Desktop clicks find no window; app windows sit at layer 0; menus and popovers above.
+                if (WindowWatch.window(at: location)?.layer ?? 0) <= 0 {
                     onRehide()
                 }
             }
@@ -294,7 +493,7 @@ private final class RehideMonitor {
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                if Self.isInMenuBar(NSEvent.mouseLocation) || !WindowWatch.newMenus(since: self.menuBaseline).isEmpty {
+                if Self.isInMenuBar(NSEvent.mouseLocation) || !WindowWatch.newPopups(of: nil, since: self.baseline, screenTop: 0).isEmpty {
                     self.awaySince = nil
                 } else if let awaySince = self.awaySince {
                     if Date().timeIntervalSince(awaySince) >= 15 {
@@ -302,6 +501,8 @@ private final class RehideMonitor {
                     }
                 } else {
                     self.awaySince = Date()
+                    // Windows that stay up for good (a HUD, a pinned popover) shouldn't hold the items forever.
+                    self.baseline = WindowWatch.ids()
                 }
             }
         }

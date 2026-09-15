@@ -11,6 +11,7 @@ struct BarEntry {
 @MainActor
 final class BarController {
     var onSelect: ((MenuBarItem) -> Void)?
+    var onClose: (() -> Void)?
 
     private var panel: BarPanel?
     private var monitors: [Any] = []
@@ -23,12 +24,17 @@ final class BarController {
         panel?.isVisible == true
     }
 
+    /// The items the open panel lists, to skip rebuilding it when a refresh finds the same ones.
+    private(set) var shownItemIDs: [String] = []
+
     /// - Parameters:
     ///   - anchor: The chevron's frame in AppKit screen coordinates; the bar is centred under it.
     ///   - appearance: The menu bar's appearance, so captured icons stay legible.
     func show(entries: [BarEntry], message: String?, mode: DisplayMode, anchor: CGRect?, screen: NSScreen?, appearance: NSAppearance?) {
         close()
-        guard let screen = screen ?? NSScreen.main else { return }
+        shownItemIDs = entries.map(\.item.id)
+        let anchorScreen = anchor.flatMap { anchor in NSScreen.screens.first { $0.frame.contains(NSPoint(x: anchor.midX, y: anchor.midY)) } }
+        guard let screen = anchorScreen ?? screen ?? NSScreen.main else { return }
 
         let views = entries.map { entry in
             let view = BarItemView(entry: entry, showsName: mode == .list, fixedWidth: mode == .grid ? 44 : nil)
@@ -128,6 +134,7 @@ final class BarController {
         panel.onCancel = nil
         panel.orderOut(nil)
         closedAt = Date()
+        onClose?()
     }
 }
 
@@ -185,8 +192,14 @@ private final class BarItemView: NSView {
             imageView.image = image
             let scale = min(1, (Self.height - 10) / max(image.size.height, 1))
             imageSize = NSSize(width: image.size.width * scale, height: image.size.height * scale)
+        } else if let icon = entry.item.appIcon {
+            imageView.image = icon
+            imageSize = NSSize(width: 18, height: 18)
         } else {
-            imageView.image = entry.item.appIcon
+            // Apple's items have no app icon; show their symbol until they're pictured.
+            let symbol = NSImage(systemSymbolName: entry.item.systemItem?.symbolName ?? "questionmark.square.dashed", accessibilityDescription: entry.item.displayName)
+            imageView.image = symbol?.withSymbolConfiguration(.init(pointSize: 14, weight: .medium))
+            imageView.contentTintColor = .labelColor
             imageSize = NSSize(width: 18, height: 18)
         }
         if let fixedWidth, imageSize.width > fixedWidth - 8 {

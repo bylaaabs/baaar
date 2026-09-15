@@ -7,8 +7,10 @@ import ApplicationServices
 /// no longer exist; each app's `AXExtrasMenuBar` is the only public item list.
 enum ItemScanner {
     private static let messagingTimeout: Float = 0.25
+    private static let queue = DispatchQueue(label: "com.aaangelmartin.baaar.scanner", qos: .userInitiated, attributes: .concurrent)
 
-    /// Scans every app concurrently, off the main thread; a slow app only costs its own timeout.
+    /// Scans every app in parallel on a dedicated queue, so blocking AX calls never tie up
+    /// Swift's shared thread pool and one slow app only costs its own timeout.
     ///
     /// The main thread must never query baaar's own items: AX requests to our own
     /// process are answered on the main thread, so it would wait on itself.
@@ -17,15 +19,18 @@ enum ItemScanner {
         let apps = NSWorkspace.shared.runningApplications
             .filter { pids?.contains($0.processIdentifier) ?? true }
             .map { AppRef(pid: $0.processIdentifier, bundleIdentifier: $0.bundleIdentifier, name: $0.localizedName ?? $0.bundleIdentifier ?? "App") }
-        let results = await withTaskGroup(of: AppScan.self) { group in
-            for app in apps {
-                group.addTask { scan(app, ownPID: ownPID) }
+        return await withCheckedContinuation { continuation in
+            queue.async {
+                let results = ResultBox(count: apps.count)
+                DispatchQueue.concurrentPerform(iterations: apps.count) { index in
+                    results.set(index, scan(apps[index], ownPID: ownPID))
+                }
+                let scans = results.values
+                var snapshot = MenuBarSnapshot(items: scans.flatMap(\.items), overflowButtonFrame: scans.lazy.compactMap(\.overflowButtonFrame).first)
+                snapshot.items.sort { ($0.frame?.minX ?? -.infinity) < ($1.frame?.minX ?? -.infinity) }
+                continuation.resume(returning: snapshot)
             }
-            return await group.reduce(into: [AppScan]()) { $0.append($1) }
         }
-        var snapshot = MenuBarSnapshot(items: results.flatMap(\.items), overflowButtonFrame: results.lazy.compactMap(\.overflowButtonFrame).first)
-        snapshot.items.sort { ($0.frame?.minX ?? -.infinity) < ($1.frame?.minX ?? -.infinity) }
-        return snapshot
     }
 
     private struct AppRef: Sendable {
@@ -39,31 +44,57 @@ enum ItemScanner {
         var overflowButtonFrame: CGRect?
     }
 
-    private nonisolated static func scan(_ app: AppRef, ownPID: pid_t) -> AppScan {
+    /// Collects per-app results from `concurrentPerform`.
+    private final class ResultBox: @unchecked Sendable {
+        private var storage: [AppScan]
+        private let lock = NSLock()
+
+        init(count: Int) {
+            storage = Array(repeating: AppScan(), count: count)
+        }
+
+        func set(_ index: Int, _ value: AppScan) {
+            lock.withLock { storage[index] = value }
+        }
+
+        var values: [AppScan] {
+            lock.withLock { storage }
+        }
+    }
+
+    private static func scan(_ app: AppRef, ownPID: pid_t) -> AppScan {
         var result = AppScan()
         let appElement = AXUIElementCreateApplication(app.pid)
         AXUIElementSetMessagingTimeout(appElement, messagingTimeout)
         guard let extras: AXUIElement = AX.value(appElement, "AXExtrasMenuBar") else { return result }
         AXUIElementSetMessagingTimeout(extras, messagingTimeout)
+        let owner = app.bundleIdentifier ?? "pid\(app.pid)"
         let children: [AXUIElement] = AX.value(extras, kAXChildrenAttribute) ?? []
         for (index, child) in children.enumerated() {
             AXUIElementSetMessagingTimeout(child, messagingTimeout)
-            let role: String? = AX.value(child, kAXRoleAttribute)
+            var element = child
+            var role: String? = AX.value(child, kAXRoleAttribute)
             if role == kAXButtonRole {
                 result.overflowButtonFrame = AX.frame(child)
                 continue
             }
-            let identifier = (AX.value(child, kAXIdentifierAttribute) as String?)?.nilIfEmpty
+            // MenuBarAgent wraps each of Apple's items in a hosting group; the pressable item is inside.
+            if role == kAXGroupRole, let inner = (AX.value(child, kAXChildrenAttribute) as [AXUIElement]?)?.first {
+                AXUIElementSetMessagingTimeout(inner, messagingTimeout)
+                element = inner
+                role = AX.value(inner, kAXRoleAttribute)
+            }
+            let identifier = (AX.value(element, kAXIdentifierAttribute) as String?)?.nilIfEmpty
             // Titles and help text change with state ("Click to prevent sleep"), so they never go into the id.
-            let owner = app.bundleIdentifier ?? "pid\(app.pid)"
             result.items.append(MenuBarItem(
                 id: "\(owner)/\(identifier ?? "item\(index)")",
-                element: AXElement(raw: child),
+                element: AXElement(raw: element),
                 pid: app.pid,
                 bundleIdentifier: app.bundleIdentifier,
                 appName: app.name,
-                label: firstString(of: child, [kAXTitleAttribute, kAXDescriptionAttribute]),
-                frame: AX.frame(child),
+                label: firstString(of: element, [kAXTitleAttribute, kAXDescriptionAttribute]),
+                identifier: identifier,
+                frame: AX.frame(element),
                 isPressable: role == "AXMenuBarItem",
                 isOwn: app.pid == ownPID
             ))
@@ -80,14 +111,14 @@ private func firstString(of element: AXUIElement, _ attributes: [String]) -> Str
 }
 
 enum AX {
-    nonisolated static func value<T>(_ element: AXUIElement, _ attribute: String) -> T? {
+    static func value<T>(_ element: AXUIElement, _ attribute: String) -> T? {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else { return nil }
         return value as? T
     }
 
     /// AX frame in global coordinates, top-left origin.
-    nonisolated static func frame(_ element: AXUIElement) -> CGRect? {
+    static func frame(_ element: AXUIElement) -> CGRect? {
         var position = CGPoint.zero
         var size = CGSize.zero
         guard
@@ -99,28 +130,31 @@ enum AX {
         return CGRect(origin: position, size: size)
     }
 
-    nonisolated static func actions(_ element: AXUIElement) -> [String] {
+    static func actions(_ element: AXUIElement) -> [String] {
         var names: CFArray?
         guard AXUIElementCopyActionNames(element, &names) == .success else { return [] }
         return names as? [String] ?? []
     }
 
-    /// Presses an item without waiting for it.
+    /// Presses an item and returns once the owning app is done with it.
     ///
-    /// `AXPress` only returns once the owning app is done, which for a status item
-    /// with a menu is when the menu closes, so it runs on its own thread and baaar
-    /// watches the app's windows instead.
-    nonisolated static func press(_ element: AXElement, id: String) {
-        DispatchQueue.global(qos: .userInitiated).async {
-            AXUIElementSetMessagingTimeout(element.raw, 120)
-            let result = AXUIElementPerformAction(element.raw, kAXPressAction as CFString)
-            if result != .success, result != .cannotComplete {
-                Log.write("press \(id) failed with AXError \(result.rawValue)")
+    /// For an item with a menu that is when the menu closes; for a popover or a
+    /// window it returns right away. The call runs on its own thread, so an app
+    /// that never answers only costs that thread.
+    static func press(_ element: AXElement, id: String) async {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                AXUIElementSetMessagingTimeout(element.raw, 120)
+                let result = AXUIElementPerformAction(element.raw, kAXPressAction as CFString)
+                if result != .success, result != .cannotComplete {
+                    Log.write("press \(id) failed with AXError \(result.rawValue)")
+                }
+                continuation.resume()
             }
         }
     }
 
-    private nonisolated static func axValue(_ element: AXUIElement, _ attribute: String) -> AXValue? {
+    private static func axValue(_ element: AXUIElement, _ attribute: String) -> AXValue? {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,
               let value, CFGetTypeID(value) == AXValueGetTypeID() else { return nil }

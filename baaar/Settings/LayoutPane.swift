@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 
 struct LayoutPane: View {
     let model: AppModel
+    let reloader: ModelReloader
 
     var body: some View {
         ScrollView {
@@ -33,19 +34,26 @@ struct LayoutPane: View {
 
                 ForEach(MenuBarSection.allCases, id: \.self) { section in
                     SectionBar(section: section, groups: model.groups(in: section)) { id in
-                        model.move(id, to: section)
+                        move(id, to: section)
                     } onMove: { id, target in
-                        model.move(id, to: target)
+                        move(id, to: target)
                     }
                 }
 
-                Text("Apple's own icons other than Wi-Fi, Bluetooth, Battery, Sound, Displays, Keyboard, Screen Mirroring, Clock and Control Center can't stay visible while items are hidden.")
+                Text("baaar hides whole apps. Apple's items listed here can be hidden one by one; other Apple items (like Focus or Fast User Switching) disappear while anything is hidden.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(20)
         }
+        .task { reloader.reloadIfStale() }
+    }
+
+    /// Like `AppModel.move`, but a burst of drops shares one reload instead of re-reading the menu bar per drop.
+    private func move(_ bundleIdentifier: String, to section: MenuBarSection) {
+        model.controller?.setSection(section, forBundle: bundleIdentifier)
+        reloader.request()
     }
 
     private var header: some View {
@@ -103,8 +111,8 @@ private struct SectionBar: View {
     private var subtitle: String {
         switch section {
         case .visible: "Always in the menu bar."
-        case .hidden: "Shown when you click the ‹ chevron."
-        case .alwaysHidden: "Shown when you ⌥-click the ‹ chevron."
+        case .hidden: "Shown when you click the chevron."
+        case .alwaysHidden: "Shown when you ⌥-click the chevron."
         }
     }
 
@@ -205,6 +213,10 @@ private struct AppGroupChip: View {
                 Image(nsImage: icon)
                     .resizable()
                     .interpolation(.high)
+                    .frame(width: 18, height: 18)
+            } else if group.isSystem, let item = SystemItem(key: group.bundleIdentifier) {
+                Image(systemName: item.symbolName)
+                    .font(.system(size: 13))
                     .frame(width: 18, height: 18)
             } else {
                 Image(systemName: "app.dashed")

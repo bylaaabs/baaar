@@ -3,17 +3,51 @@ import SwiftUI
 struct GeneralPane: View {
     @Bindable var model: AppModel
 
+    /// Where the chevron points while hidden items are tucked away in the selected mode.
+    private var restingDirection: ChevronDirection {
+        model.displayMode == .menuBar ? .left : .down
+    }
+
     var body: some View {
         Form {
             Section("Show hidden items") {
                 HStack(spacing: 12) {
                     ForEach(DisplayMode.allCases, id: \.self) { mode in
-                        DisplayModeCard(mode: mode, isSelected: model.displayMode == mode) {
+                        DisplayModeCard(mode: mode, chevronStyle: model.chevronStyle, isSelected: model.displayMode == mode) {
                             model.displayMode = mode
                         }
                     }
                 }
                 .padding(.vertical, 4)
+            }
+
+            Section {
+                LabeledContent {
+                    HStack(spacing: 4) {
+                        ForEach(ChevronStyle.allCases, id: \.self) { style in
+                            ChevronStyleButton(
+                                style: style,
+                                direction: restingDirection,
+                                isSelected: model.chevronStyle == style
+                            ) {
+                                model.chevronStyle = style
+                            }
+                        }
+                    }
+                } label: {
+                    Text("Chevron icon")
+                    Text("The chevron points where hidden items appear: sideways in the menu bar, down for the bar, list and grid.")
+                }
+
+                Picker(selection: $model.newAppSection) {
+                    ForEach(MenuBarSection.allCases, id: \.self) { section in
+                        Text(section.title).tag(section)
+                    }
+                } label: {
+                    Text("New apps go to")
+                    Text("Where apps baaar hasn't seen before are placed.")
+                }
+                .pickerStyle(.menu)
             }
 
             Section {
@@ -23,7 +57,7 @@ struct GeneralPane: View {
                 }
                 Toggle("Launch at login", isOn: $model.launchesAtLogin)
             } footer: {
-                Text("Click the ‹ chevron in the menu bar to show hidden items, or ⌥-click it to include always-hidden ones. The baaar icon opens these settings.")
+                Text("Click the chevron to show hidden items. ⌥-click it, or use Show All in its menu, to include always-hidden ones. The baaar icon opens this window.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -33,15 +67,41 @@ struct GeneralPane: View {
     }
 }
 
+private struct ChevronStyleButton: View {
+    let style: ChevronStyle
+    let direction: ChevronDirection
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: style.symbolName(direction))
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 30, height: 24)
+                .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+                .background(
+                    isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.fill.quaternary),
+                    in: .rect(cornerRadius: 6, style: .continuous)
+                )
+                .contentShape(.rect(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+        .help(style.title)
+        .accessibilityLabel(style.title)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
 private struct DisplayModeCard: View {
     let mode: DisplayMode
+    let chevronStyle: ChevronStyle
     let isSelected: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             VStack(spacing: 8) {
-                DisplayModePreview(mode: mode)
+                DisplayModePreview(mode: mode, chevronStyle: chevronStyle)
                     .frame(height: 64)
                     .frame(maxWidth: .infinity)
                     .background(.fill.quaternary, in: .rect(cornerRadius: 6))
@@ -74,6 +134,7 @@ private struct DisplayModeCard: View {
 /// A miniature screen: a menu bar strip with item dots, and how hidden items appear in this mode.
 private struct DisplayModePreview: View {
     let mode: DisplayMode
+    let chevronStyle: ChevronStyle
 
     private let dot: CGFloat = 4
 
@@ -133,7 +194,7 @@ private struct DisplayModePreview: View {
             if mode == .menuBar {
                 ForEach(0..<3, id: \.self) { _ in hiddenDot }
             }
-            Image(systemName: "chevron.left")
+            Image(systemName: chevronStyle.symbolName(mode == .menuBar ? .left : .down))
                 .font(.system(size: 5, weight: .bold))
                 .foregroundStyle(.secondary)
             ForEach(0..<3, id: \.self) { _ in

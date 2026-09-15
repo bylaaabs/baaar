@@ -36,6 +36,7 @@ final class SettingsNavigation {
 
 struct SettingsView: View {
     let model: AppModel
+    let reloader: ModelReloader
     @Bindable var navigation: SettingsNavigation
 
     var body: some View {
@@ -64,7 +65,7 @@ struct SettingsView: View {
     private var detail: some View {
         switch navigation.pane {
         case .general: GeneralPane(model: model)
-        case .layout: LayoutPane(model: model)
+        case .layout: LayoutPane(model: model, reloader: reloader)
         case .permissions: PermissionsPane(model: model)
         case .about: AboutPane()
         }
