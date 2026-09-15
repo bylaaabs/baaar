@@ -9,7 +9,7 @@
 #   3. make-dmg.sh             dist/baaar-v0.4.0-alpha.1.dmg and .zip from the stapled bundle
 #   4. notarize.sh             the DMG, then staples it
 #   5. checksum.sh             SHA-256 and the Homebrew cask
-#   6. git tag -s v0.4.0-alpha.1, push the tag, gh release create with the CHANGELOG section
+#   6. git tag v0.1.0 (signed when git has a signing key), push the tag, gh release create with the CHANGELOG section
 #
 # It refuses to run with uncommitted changes, when the tag already exists, when
 # project.yml's MARKETING_VERSION differs, or when CHANGELOG.md has no section
@@ -110,8 +110,12 @@ if [[ $DRY_RUN -eq 1 ]]; then
 fi
 
 step "Tagging $TAG"
-# Signed tags are the rule; -s needs a configured signing key.
-git tag -s "$TAG" -m "baaar $VERSION" || die "could not create a signed tag; configure git tag signing (user.signingkey)"
+# Signed when git knows a signing key; an annotated tag otherwise, like the other laaabs repositories.
+if [[ -n "$(git config --get user.signingkey || true)" ]]; then
+  git tag -s "$TAG" -m "baaar $VERSION" || die "could not create a signed tag"
+else
+  git tag -a "$TAG" -m "baaar $VERSION"
+fi
 git push origin "refs/tags/$TAG"
 
 step "Publishing the GitHub release"
