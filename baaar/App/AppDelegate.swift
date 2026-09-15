@@ -267,14 +267,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             },
             "layoutentries": { app, _ in
                 await app.model.reload()
-                Log.write("layout entries\n" + app.model.layoutItems.map { "  \($0.section.rawValue)\t\($0.canHide ? "hide" : "fixed")\t\($0.canReorder ? "order" : "-")\t\($0.name)\t\($0.id)" }.joined(separator: "\n"))
+                Log.write("layout entries\n" + app.model.layoutItems.map { "  \($0.section.rawValue)\t\($0.allowedSections.count > 1 ? "hide" : "fixed")\t\($0.canReorder ? "order" : "-")\t\($0.name)\t\($0.id)" }.joined(separator: "\n"))
             },
-            // "<entry id>|<section>|<index>"
-            "place": { app, argument in
+            // "<entry id>|<section>|<index>": the same arrangement a drop in the layout editor writes.
+            "arrange": { app, argument in
                 let parts = (argument ?? "").split(separator: "|").map(String.init)
                 guard parts.count == 3, let section = MenuBarSection(rawValue: parts[1]), let index = Int(parts[2]) else { return }
                 await app.model.reload()
-                app.model.place(parts[0], in: section, at: index)
+                let items = app.model.layoutItems
+                guard let item = items.first(where: { $0.id == parts[0] }), item.allowedSections.contains(section) else { Log.write("arrange: refused"); return }
+                var strips = Dictionary(grouping: items.filter { $0.id != item.id }, by: \.section).mapValues { $0.map(\.id) }
+                strips[section, default: []].insert(item.id, at: min(index, strips[section]?.count ?? 0))
+                let order = [MenuBarSection.alwaysHidden, .hidden, .visible].flatMap { strips[$0] ?? [] }
+                app.model.applyLayout(order: order, sections: item.sectionKey.map { [$0: section] } ?? [:])
+                try? await Task.sleep(for: .seconds(1))
+                await app.model.reload()
+                Log.write("arranged\n" + [MenuBarSection.alwaysHidden, .hidden, .visible].map { strip in "  \(strip.rawValue): " + app.model.layoutItems(in: strip).map(\.name).joined(separator: ", ") }.joined(separator: "\n"))
             },
             "layoutread": { _, _ in
                 let positions = MenuBarLayoutTable.positions()

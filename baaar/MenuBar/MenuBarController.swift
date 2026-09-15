@@ -44,6 +44,8 @@ final class MenuBarController {
     private var captureFailures: [String: Date] = [:]
     /// Items as last seen, so the bar still lists Apple's items after MenuBarAgent drops concealed ones from AX.
     private var lastSeen: [String: MenuBarItem] = [:]
+    /// Each item's position in the real left-to-right order, from the last layout read.
+    private var layoutRank: [String: Int] = [:]
 
     private var clockMonitor: Any?
 
@@ -54,7 +56,8 @@ final class MenuBarController {
         // Keep a recent picture of the menu bar so the bar opens instantly.
         Task { [weak self] in
             while !Task.isCancelled {
-                await self?.refreshSnapshot()
+                // Reads the layout table too, so panels list items in the real order.
+                _ = await self?.layoutEntries()
                 try? await Task.sleep(for: .seconds(5))
             }
         }
@@ -215,7 +218,9 @@ final class MenuBarController {
 
     /// Items in the given sections, in menu bar order, from the cached scan unless another is given.
     func items(in sections: Set<MenuBarSection>, from snapshot: MenuBarSnapshot? = nil) -> [MenuBarItem] {
-        manageableItems(in: snapshot ?? self.snapshot).filter { sections.contains(section(of: $0)) }
+        manageableItems(in: snapshot ?? self.snapshot)
+            .filter { sections.contains(section(of: $0)) }
+            .sorted { (layoutRank[$0.id] ?? .max, $0.frame?.minX ?? 0) < (layoutRank[$1.id] ?? .max, $1.frame?.minX ?? 0) }
     }
 
     /// Every app and system item in the menu bar, for the layout editor.
@@ -305,12 +310,14 @@ final class MenuBarController {
         for item in known where !used.contains(item.id) && (item.isManageable || item.isOwn || item.bundleIdentifier == MenuBarItem.menuBarAgent) {
             entries.append(LayoutEntry(id: "ax:\(item.id)", weight: nil, item: item))
         }
-        return entries.sorted { lhs, rhs in
+        let sorted = entries.sorted { lhs, rhs in
             switch (lhs.weight, rhs.weight) {
             case let (l?, r?) where l != r: l > r
             default: (lhs.item.frame?.minX ?? 0) < (rhs.item.frame?.minX ?? 0)
             }
         }
+        layoutRank = Dictionary(sorted.enumerated().map { ($0.element.item.id, $0.offset) }) { first, _ in first }
+        return sorted
     }
 
     /// Whether a layout table module name (`Clock`, `BentoBox-0`) names this MenuBarAgent item (`com.apple.menuextra.clock`).
@@ -333,39 +340,27 @@ final class MenuBarController {
         return candidates.contains { identifier.hasSuffix(".\($0)") || identifier.hasSuffix($0) }
     }
 
-    /// Moves an item to a position in a section: the section applies to its whole app, the order is
-    /// written to the layout table so MenuBarAgent re-sorts the bar.
-    ///
-    /// - Parameter neighbours: the ids of the section's items left to right, without the moved item.
-    func place(_ entryID: String, sectionKey: String?, in section: MenuBarSection, at index: Int, neighbours: [String]) {
-        if let sectionKey, Settings.section(forBundle: sectionKey) != section {
-            setSection(section, forBundle: sectionKey)
+    /// Whether a restriction is hiding something right now, which also hides Apple modules outside the nine system items.
+    var isRestricting: Bool {
+        !restriction.concealedKeys.isEmpty
+    }
+
+    /// Applies an arrangement from the layout editor: section changes for apps, and the complete
+    /// left-to-right order (always hidden, then hidden, then visible) written to the layout table
+    /// as evenly spaced weights, so the table and the editor never disagree and sections stay contiguous.
+    func applyLayout(order: [String], sections: [String: MenuBarSection]) {
+        for (key, section) in sections where Settings.section(forBundle: key) != section {
+            Settings.setSection(section, forBundle: key)
+            Settings.knownKeys.insert(key)
         }
-        guard entryID.hasPrefix("status:") || entryID.hasPrefix("module:"), var positions = MenuBarLayoutTable.positions() else { return }
-        func weight(_ id: String) -> Double? {
-            positions[id]
+        apply()
+        let tableIDs = order.filter { $0.hasPrefix("status:") || $0.hasPrefix("module:") }
+        guard !tableIDs.isEmpty, MenuBarLayoutTable.positions() != nil else { return }
+        var weights: [String: Double] = [:]
+        for (offset, id) in tableIDs.enumerated() {
+            weights[id] = Double((tableIDs.count - offset) * 32)
         }
-        let left = index > 0 ? neighbours[index - 1] : nil
-        let right = index < neighbours.count ? neighbours[index] : nil
-        var target: Double?
-        switch (left.flatMap(weight), right.flatMap(weight)) {
-        case let (l?, r?) where l - r > 1: target = (l + r) / 2
-        case let (l?, r?):
-            // No room between them: spread the whole table out, keeping its order, then take the gap.
-            let ordered = positions.sorted { $0.value > $1.value }
-            for (offset, entry) in ordered.enumerated() {
-                positions[entry.key] = Double((ordered.count - offset) * 32)
-            }
-            MenuBarLayoutTable.setPositions(positions)
-            let l2 = positions[left ?? ""] ?? l, r2 = positions[right ?? ""] ?? r
-            target = (l2 + r2) / 2
-        case let (l?, nil): target = l - 16
-        case let (nil, r?): target = r + 16
-        default: target = nil
-        }
-        if let target {
-            MenuBarLayoutTable.setPositions([entryID: target])
-        }
+        MenuBarLayoutTable.setPositions(weights)
     }
 
     // MARK: - Opening an item

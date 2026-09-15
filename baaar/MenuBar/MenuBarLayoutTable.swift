@@ -63,8 +63,13 @@ enum MenuBarLayoutTable {
         return hasAccess
     }
 
-    /// Every item's weight, straight from the file.
+    /// Every item's weight, read through cfprefsd so a write shows up at once; the file on disk lags seconds behind.
     static func positions() -> [String: Double]? {
+        // Drop this process's cached copy so moves made in the menu bar itself show up too.
+        CFPreferencesSynchronize(url.path as CFString, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+        if let value = CFPreferencesCopyValue(key as CFString, url.path as CFString, kCFPreferencesCurrentUser, kCFPreferencesAnyHost) as? [String: Any] {
+            return value.compactMapValues { ($0 as? NSNumber)?.doubleValue }
+        }
         guard let data = try? Data(contentsOf: url),
               let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else { return nil }
         return (plist[key] as? [String: Any])?.compactMapValues { ($0 as? NSNumber)?.doubleValue }

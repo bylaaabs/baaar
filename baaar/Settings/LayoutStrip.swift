@@ -173,7 +173,7 @@ private struct StripDropDelegate: DropDelegate {
 
     /// Nil when this strip refuses the dragged item: nothing of baaar's is being dragged, or it can't be hidden.
     private func resolve(at location: CGPoint) -> StripDropTarget? {
-        guard let dragged, dragged.canHide || section == .visible else { return nil }
+        guard let dragged, dragged.allowedSections.contains(section) else { return nil }
         let neighbours = items.filter { $0.id != dragged.id }
         let current = items.firstIndex { $0.id == dragged.id }
 
@@ -214,17 +214,14 @@ private struct LayoutChip: View {
             .padding(.horizontal, 6)
             .frame(height: 28)
             .background(isHovered && !isDragged ? BrandColors.surfaceSelected : .clear, in: RoundedRectangle(cornerRadius: 6))
-            .overlay(alignment: .bottomTrailing) {
-                if !item.canHide { lockBadge }
-            }
             .opacity(isDragged ? 0.35 : 1)
             .contentShape(RoundedRectangle(cornerRadius: 6))
             .onHover { isHovered = $0 }
             .animation(.easeOut(duration: 0.12), value: isHovered)
             .animation(.easeOut(duration: 0.12), value: isDragged)
-            .help(item.name)
+            .help(help)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(item.canHide ? item.name : "\(item.name), always visible")
+            .accessibilityLabel(help)
             .accessibilityActions {
                 let entries = menu(item)
                 ForEach(entries.indices, id: \.self) { index in
@@ -244,14 +241,12 @@ private struct LayoutChip: View {
             .brandContextMenu { menu(item) }
     }
 
-    private var lockBadge: some View {
-        Image(systemName: "lock.fill")
-            .font(.system(size: 6, weight: .semibold))
-            .foregroundStyle(BrandColors.onSecondary)
-            .frame(width: 11, height: 11)
-            .background(BrandColors.surfaceHigh, in: Circle())
-            .offset(x: 1, y: 1)
-            .accessibilityHidden(true)
+    /// The name, plus why the item can't change strips when it can't.
+    private var help: String {
+        guard item.allowedSections.count == 1, let only = item.allowedSections.first else { return item.name }
+        return only == .visible
+            ? "\(item.name) - baaar's own items stay visible"
+            : "\(item.name) - macos hides this while anything is hidden, and shows it again when nothing is"
     }
 
     @ViewBuilder

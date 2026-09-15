@@ -124,10 +124,11 @@ struct LayoutPane: View {
         }
     }
 
-    /// Places an item at `index` among the other items of `section` as shown, left to right.
+    /// Places an item at `index` among the other items of `section` as shown, left to right, and writes
+    /// the whole arrangement: every strip in order, always hidden first, so the menu bar matches exactly.
     private func place(_ id: String, in section: MenuBarSection, at index: Int, items: [AppModel.LayoutItem]) {
         drag.itemID = nil
-        guard let item = items.first(where: { $0.id == id }), item.canHide || section == .visible else { return }
+        guard let item = items.first(where: { $0.id == id }), item.allowedSections.contains(section) else { return }
         let neighbours = items.filter { $0.section == section && $0.id != id }
         let index = min(max(index, 0), neighbours.count)
         if item.section == section {
@@ -136,21 +137,22 @@ struct LayoutPane: View {
         }
 
         draftGeneration += 1
-        draft = LayoutDraft(moving: item, to: section, at: index, in: items, generation: draftGeneration)
-        model.place(id, in: section, at: modelIndex(of: id, in: section, at: index, shown: neighbours))
-    }
-
-    /// The model counts `index` over its own items, which lag behind a draft: anchor on the neighbours shown.
-    private func modelIndex(of id: String, in section: MenuBarSection, at index: Int, shown neighbours: [AppModel.LayoutItem]) -> Int {
-        let known = model.layoutItems(in: section).map(\.id).filter { $0 != id }
-        if index < neighbours.count, let right = known.firstIndex(of: neighbours[index].id) { return right }
-        if index > 0, let left = known.firstIndex(of: neighbours[index - 1].id) { return left + 1 }
-        return index == 0 ? 0 : known.count
+        let draft = LayoutDraft(moving: item, to: section, at: index, in: items, generation: draftGeneration)
+        self.draft = draft
+        let arranged = draft.apply(to: items)
+        let order = [MenuBarSection.alwaysHidden, .hidden, .visible].flatMap { strip in
+            arranged.filter { $0.section == strip }.map(\.id)
+        }
+        var sections: [String: MenuBarSection] = [:]
+        if let key = item.sectionKey, item.section != section {
+            sections[key] = section
+        }
+        model.applyLayout(order: order, sections: sections)
     }
 
     private func menuItems(for item: AppModel.LayoutItem, items: [AppModel.LayoutItem]) -> [BrandMenu.Item] {
         var entries: [BrandMenu.Item] = []
-        if item.canHide {
+        if item.allowedSections.count > 1 {
             let before = items.prefix { $0.id != item.id }
             for section in MenuBarSection.allCases where section != item.section {
                 // Keep its place among the items already in that strip.
@@ -236,7 +238,7 @@ private extension AppModel.LayoutItem {
             image: image,
             appIcon: appIcon,
             symbolName: symbolName,
-            canHide: canHide,
+            allowedSections: allowedSections,
             canReorder: canReorder
         )
     }

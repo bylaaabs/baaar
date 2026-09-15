@@ -39,14 +39,15 @@ final class AppModel {
         let appIcon: NSImage?
         /// Shown when there's neither a captured image nor an app icon.
         let symbolName: String
-        /// baaar's own items and Apple modules MenuBarAgent won't keep visible stay in the visible section.
-        let canHide: Bool
+        /// Sections the item may live in: baaar's own items stay visible; Apple modules outside the nine
+        /// system items are hidden by macOS whenever anything is hidden, so they can't be placed.
+        let allowedSections: Set<MenuBarSection>
         /// Needs the layout table: items without an entry keep their place.
         let canReorder: Bool
 
         static func == (lhs: LayoutItem, rhs: LayoutItem) -> Bool {
             lhs.id == rhs.id && lhs.name == rhs.name && lhs.section == rhs.section && lhs.image === rhs.image
-                && lhs.canHide == rhs.canHide && lhs.canReorder == rhs.canReorder
+                && lhs.allowedSections == rhs.allowedSections && lhs.canReorder == rhs.canReorder
         }
     }
 
@@ -59,15 +60,11 @@ final class AppModel {
         layoutItems.filter { $0.section == section }
     }
 
-    /// Places an item at `index` among the items of `section` (left to right), changing its app's section if needed.
-    func place(_ id: String, in section: MenuBarSection, at index: Int) {
-        guard let item = layoutItems.first(where: { $0.id == id }) else { return }
-        guard item.canHide || section == .visible else { return }
-        let neighbours = layoutItems(in: section).map(\.id).filter { $0 != id }
-        controller?.place(id, sectionKey: item.sectionKey, in: section, at: min(max(index, 0), neighbours.count), neighbours: item.canReorder ? neighbours : [])
+    /// Applies an arrangement: `order` is every item left to right across the strips (always hidden,
+    /// hidden, visible) and `sections` the new section of each app key that moved.
+    func applyLayout(order: [String], sections: [String: MenuBarSection]) {
+        controller?.applyLayout(order: order, sections: sections)
         Task {
-            // MenuBarAgent re-sorts within a moment; read the result back.
-            try? await Task.sleep(for: .milliseconds(400))
             await reload()
         }
     }
@@ -149,19 +146,21 @@ final class AppModel {
         guard let controller else { return }
         groups = await controller.appGroups()
         hasLayoutAccess = MenuBarLayoutTable.hasAccess
+        let restricting = controller.isRestricting
         layoutItems = await controller.layoutEntries().map { entry in
             let item = entry.item
             let isAppleModule = item.bundleIdentifier == MenuBarItem.menuBarAgent && item.systemItem == nil
+            let fixedSection: MenuBarSection? = item.isOwn ? .visible : isAppleModule ? (restricting ? .hidden : .visible) : nil
             return LayoutItem(
                 id: entry.id,
                 name: item.isOwn ? (item.identifier == ControlItems.Identifier.chevron ? "baaar chevron" : "baaar") : item.displayName,
-                section: item.sectionKey.map(Settings.section(forBundle:)) ?? .visible,
-                sectionKey: item.sectionKey,
+                section: fixedSection ?? item.sectionKey.map(Settings.section(forBundle:)) ?? .visible,
+                sectionKey: fixedSection == nil ? item.sectionKey : nil,
                 // baaar's own items and Apple's have no useful app icon; the clock's picture would show a frozen time.
                 image: item.isOwn || item.systemItem == .clock ? nil : controller.images.image(for: item),
                 appIcon: item.isOwn || item.bundleIdentifier == MenuBarItem.menuBarAgent ? nil : item.appIcon,
                 symbolName: Self.symbolName(for: item),
-                canHide: item.sectionKey != nil && !item.isOwn && !isAppleModule,
+                allowedSections: fixedSection.map { [$0] } ?? Set(MenuBarSection.allCases),
                 canReorder: hasLayoutAccess && entry.weight != nil
             )
         }
