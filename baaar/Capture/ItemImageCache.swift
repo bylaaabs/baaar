@@ -12,7 +12,7 @@ final class ItemImageCache {
 
     init() {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        directory = caches.appending(path: "com.aaangelmartin.baaar/items", directoryHint: .isDirectory)
+        directory = caches.appending(path: "com.aaangelmartin.baaar/items-v2", directoryHint: .isDirectory)
     }
 
     func image(for item: MenuBarItem) -> NSImage? {
@@ -48,8 +48,9 @@ final class ItemImageCache {
                     width: frame.width * scale,
                     height: frame.height * scale
                 ).integral
-                guard let cropped = strip.cropping(to: crop), Self.hasVisiblePixels(cropped) else { continue }
-                store(NSImage(cgImage: cropped, size: frame.size), cgImage: cropped, for: item.id)
+                guard let cropped = strip.cropping(to: crop), let glyph = Self.trimmed(cropped) else { continue }
+                let size = NSSize(width: CGFloat(glyph.width) / scale, height: CGFloat(glyph.height) / scale)
+                store(NSImage(cgImage: glyph, size: size), cgImage: glyph, for: item.id)
             }
         }
     }
@@ -57,7 +58,9 @@ final class ItemImageCache {
     private func store(_ image: NSImage, cgImage: CGImage, for id: String) {
         images[id] = image
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try? NSBitmapImageRep(cgImage: cgImage).representation(using: .png, properties: [:])?.write(to: fileURL(for: id))
+        let rep = NSBitmapImageRep(cgImage: cgImage)
+        rep.size = image.size // Stored as DPI, so the PNG reloads at point size on Retina.
+        try? rep.representation(using: .png, properties: [:])?.write(to: fileURL(for: id))
     }
 
     private func fileURL(for id: String) -> URL {
@@ -71,11 +74,14 @@ final class ItemImageCache {
         return NSScreen.screens.first { $0.frame.contains(point) }?.backingScaleFactor ?? 2
     }
 
-    /// A capture taken mid-animation or of an overflowed item is fully transparent.
-    private static func hasVisiblePixels(_ image: CGImage) -> Bool {
+    /// Crops an item capture to its visible pixels, dropping the padding the menu bar adds around it.
+    ///
+    /// Returns nil when there is nothing to show: a capture taken mid-animation or
+    /// of an item that is not on screen is fully transparent.
+    private static func trimmed(_ image: CGImage) -> CGImage? {
         let width = image.width
         let height = image.height
-        guard width > 0, height > 0 else { return false }
+        guard width > 0, height > 0 else { return nil }
         var pixels = [UInt8](repeating: 0, count: width * height * 4)
         let drawn = pixels.withUnsafeMutableBytes { buffer -> Bool in
             guard let context = CGContext(
@@ -85,8 +91,18 @@ final class ItemImageCache {
             context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
             return true
         }
-        guard drawn else { return false }
-        let opaque = stride(from: 3, to: pixels.count, by: 4).reduce(0) { $0 + (pixels[$1] > 160 ? 1 : 0) }
-        return opaque >= max(4, width * height / 200)
+        guard drawn else { return nil }
+
+        // Rows in the buffer run top to bottom, matching CGImage.cropping(to:).
+        var minX = width, minY = height, maxX = -1, maxY = -1, opaque = 0
+        for y in 0..<height {
+            for x in 0..<width where pixels[(y * width + x) * 4 + 3] > 24 {
+                minX = min(minX, x); maxX = max(maxX, x)
+                minY = min(minY, y); maxY = max(maxY, y)
+                if pixels[(y * width + x) * 4 + 3] > 160 { opaque += 1 }
+            }
+        }
+        guard maxX >= minX, opaque >= max(4, width * height / 200) else { return nil }
+        return image.cropping(to: CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1))
     }
 }
