@@ -39,13 +39,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        if !Permissions.hasAccessibility {
-            Permissions.requestAccessibility()
-        }
         if !VisibilityRestriction.isAvailable {
             Log.write("MenuBarAgent's visibility restriction is unavailable; items can't be hidden")
         }
         Task {
+            if !Permissions.hasAccessibility {
+                // Hiding without Accessibility would leave hidden items out of reach, so nothing hides until it's granted.
+                Log.write("waiting for accessibility access")
+                Permissions.requestAccessibility()
+                settingsWindow.show(pane: .permissions)
+                while !Permissions.hasAccessibility {
+                    try? await Task.sleep(for: .seconds(1))
+                }
+                Log.write("accessibility access granted")
+            }
+            if !Permissions.hasScreenRecording, !UserDefaults.standard.bool(forKey: "askedScreenRecording") {
+                UserDefaults.standard.set(true, forKey: "askedScreenRecording")
+                Permissions.requestScreenRecording()
+            }
             await controller.refreshSnapshot()
             // Hide right away when every hidden item already has a picture; otherwise picture them first.
             controller.setReveal(.none)
@@ -83,7 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func chevronClicked(_ event: NSEvent?) {
-        Log.write("chevron click type=\(String(describing: event?.type.rawValue)) flags=\(String(describing: event?.modifierFlags.rawValue))")
+        Log.write("chevron click type=\(String(describing: event?.type.rawValue)) eventOption=\(event?.modifierFlags.contains(.option) == true) keyboardOption=\(NSEvent.modifierFlags.contains(.option))")
         if Self.isSecondaryClick(event) {
             bar.close()
             showMenu(under: ControlItems.Identifier.chevron)
@@ -95,6 +106,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if controller.reveal != .none {
             controller.setReveal(.none)
+            return
+        }
+        guard Permissions.hasAccessibility else {
+            Permissions.requestAccessibility()
+            settingsWindow.show(pane: .permissions)
             return
         }
         // MenuBarAgent forwards status item clicks, and the forwarded event may not carry modifiers; read the keyboard instead.
