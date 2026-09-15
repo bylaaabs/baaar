@@ -1,81 +1,93 @@
 import AppKit
 
-/// The two status items baaar owns: the toggle (its icon) and the divider.
+/// The three status items baaar owns, right to left: the app icon, the hidden
+/// section's chevron and the always-hidden divider.
 ///
-/// Everything the user ⌘-drags to the left of the divider belongs to the
-/// hidden section. Hiding widens the divider until macOS can no longer fit it,
-/// which sends the divider and every item to its left out of the menu bar.
+/// Items ⌘-dragged left of the chevron are hidden; items left of the always-hidden
+/// divider only show on request. A divider collapses its section by growing until
+/// it spans to the left edge of the status area, which pushes everything to its
+/// left into macOS's overflow while the divider itself stays on screen.
 @MainActor
 final class ControlItems {
-    enum Visibility {
-        case shown
-        case hidden
+    enum Identifier {
+        static let app = "baaar.app"
+        static let hidden = "baaar.divider.hidden"
+        static let alwaysHidden = "baaar.divider.alwaysHidden"
     }
 
-    private enum AutosaveName {
-        static let toggle = "baaarToggle"
-        static let divider = "baaarDivider"
-    }
+    let appItem: NSStatusItem
+    let hiddenDivider: NSStatusItem
+    let alwaysHiddenDivider: NSStatusItem
 
-    let toggle: NSStatusItem
-    let divider: NSStatusItem
-    private(set) var visibility: Visibility = .shown
-
-    var onToggleClick: (() -> Void)?
-    var onVisibilityChange: ((Visibility) -> Void)?
+    var onAppClick: (() -> Void)?
+    var onChevronClick: (() -> Void)?
 
     init() {
-        // Seed the first-launch order: toggle rightmost, divider just left of it.
-        // Positions count points from the right edge; macOS keeps them after a ⌘-drag.
-        Self.seedPreferredPosition(1, for: AutosaveName.toggle)
-        Self.seedPreferredPosition(2, for: AutosaveName.divider)
+        // First-launch order, in points from the right edge; macOS keeps what the user ⌘-drags afterwards.
+        Self.seedPreferredPosition(1, for: "baaarToggle")
+        Self.seedPreferredPosition(2, for: "baaarDivider")
+        Self.seedPreferredPosition(3, for: "baaarAlwaysHiddenDivider")
 
-        toggle = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        toggle.autosaveName = AutosaveName.toggle
-        divider = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        divider.autosaveName = AutosaveName.divider
+        appItem = Self.makeItem(autosaveName: "baaarToggle", identifier: Identifier.app)
+        hiddenDivider = Self.makeItem(autosaveName: "baaarDivider", identifier: Identifier.hidden)
+        alwaysHiddenDivider = Self.makeItem(autosaveName: "baaarAlwaysHiddenDivider", identifier: Identifier.alwaysHidden)
 
-        if let button = toggle.button {
-            button.image = Self.symbol("menubar.rectangle", description: "baaar")
-            button.target = self
-            button.action = #selector(toggleClicked)
-            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        appItem.button?.image = Self.symbol("menubar.rectangle", description: "baaar")
+        for (item, action) in [(appItem, #selector(appClicked)), (hiddenDivider, #selector(chevronClicked))] {
+            item.button?.target = self
+            item.button?.action = action
+            item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
-        if let button = divider.button {
-            button.image = Self.symbol("chevron.compact.left", description: "baaar divider")
-            button.appearsDisabled = true
-        }
+        setNatural(.hidden)
+        setNatural(.alwaysHidden)
     }
 
-    var toggleScreen: NSScreen? {
-        toggle.button?.window?.screen ?? NSScreen.main
+    var screen: NSScreen? {
+        appItem.button?.window?.screen ?? NSScreen.main
     }
 
-    func setVisibility(_ newValue: Visibility) {
-        guard newValue != visibility else { return }
-        visibility = newValue
-        applyVisibility()
-        onVisibilityChange?(newValue)
+    func statusItem(_ divider: MenuBarSection) -> NSStatusItem {
+        divider == .alwaysHidden ? alwaysHiddenDivider : hiddenDivider
     }
 
-    func toggleVisibility() {
-        setVisibility(visibility == .shown ? .hidden : .shown)
+    func identifier(_ divider: MenuBarSection) -> String {
+        divider == .alwaysHidden ? Identifier.alwaysHidden : Identifier.hidden
     }
 
-    /// Re-applies the current state, e.g. after the screen configuration changed.
-    func applyVisibility() {
-        switch visibility {
-        case .shown:
-            divider.length = NSStatusItem.variableLength
-            divider.button?.image = Self.symbol("chevron.compact.left", description: "baaar divider")
-        case .hidden:
-            divider.button?.image = nil
-            divider.length = HideLength.value(for: toggleScreen)
-        }
+    func isNatural(_ divider: MenuBarSection) -> Bool {
+        statusItem(divider).length == NSStatusItem.variableLength
     }
 
-    @objc private func toggleClicked() {
-        onToggleClick?()
+    /// The divider at its own width, marking its section as shown.
+    func setNatural(_ divider: MenuBarSection) {
+        let item = statusItem(divider)
+        item.length = NSStatusItem.variableLength
+        item.button?.image = divider == .alwaysHidden
+            ? Self.symbol("poweron", description: "Always hidden divider")
+            : Self.symbol("chevron.right", description: "Hide menu bar items")
+    }
+
+    /// The divider stretched to `width`, marking its section as collapsed.
+    func setCollapsed(_ divider: MenuBarSection, width: CGFloat) {
+        let item = statusItem(divider)
+        item.length = width
+        // The chevron stays at the right edge, next to the visible items, so it reads as the boundary.
+        item.button?.image = divider == .alwaysHidden ? nil : Self.trailingSymbol("chevron.left", width: width, description: "Show hidden menu bar items")
+    }
+
+    @objc private func appClicked() {
+        onAppClick?()
+    }
+
+    @objc private func chevronClicked() {
+        onChevronClick?()
+    }
+
+    private static func makeItem(autosaveName: String, identifier: String) -> NSStatusItem {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.autosaveName = autosaveName
+        item.button?.setAccessibilityIdentifier(identifier)
+        return item
     }
 
     private static func seedPreferredPosition(_ position: Double, for autosaveName: String) {
@@ -85,9 +97,23 @@ final class ControlItems {
         }
     }
 
+    private static let symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+
     private static func symbol(_ name: String, description: String) -> NSImage? {
-        let image = NSImage(systemSymbolName: name, accessibilityDescription: description)
+        let image = NSImage(systemSymbolName: name, accessibilityDescription: description)?.withSymbolConfiguration(symbolConfiguration)
         image?.isTemplate = true
+        return image
+    }
+
+    private static func trailingSymbol(_ name: String, width: CGFloat, description: String) -> NSImage? {
+        guard let glyph = symbol(name, description: description) else { return nil }
+        let size = NSSize(width: max(width - 8, glyph.size.width), height: max(glyph.size.height, 16))
+        let image = NSImage(size: size, flipped: false) { rect in
+            glyph.draw(in: NSRect(x: rect.maxX - glyph.size.width - 4, y: (rect.height - glyph.size.height) / 2, width: glyph.size.width, height: glyph.size.height))
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = description
         return image
     }
 }

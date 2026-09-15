@@ -7,7 +7,7 @@ struct BarEntry {
     let image: NSImage?
 }
 
-/// The floating panel under the menu bar that lists the hidden items.
+/// The floating panel under the chevron that lists hidden items as a bar, a list or a grid.
 @MainActor
 final class BarController {
     var onSelect: ((MenuBarItem) -> Void)?
@@ -15,7 +15,7 @@ final class BarController {
     private var panel: BarPanel?
     private var monitors: [Any] = []
 
-    /// When the bar last closed. Clicking the toggle first dismisses the bar through
+    /// When the bar last closed. Clicking the chevron first dismisses the bar through
     /// the panel losing key status, so the click must not reopen it straight away.
     private(set) var closedAt = Date.distantPast
 
@@ -24,27 +24,18 @@ final class BarController {
     }
 
     /// - Parameters:
-    ///   - anchor: The baaar icon's frame in AppKit screen coordinates; the bar is centred under it.
+    ///   - anchor: The chevron's frame in AppKit screen coordinates; the bar is centred under it.
     ///   - appearance: The menu bar's appearance, so captured icons stay legible.
-    func show(entries: [BarEntry], message: String?, layout: Settings.BarLayout, anchor: CGRect?, screen: NSScreen?, appearance: NSAppearance?) {
+    func show(entries: [BarEntry], message: String?, mode: DisplayMode, anchor: CGRect?, screen: NSScreen?, appearance: NSAppearance?) {
         close()
         guard let screen = screen ?? NSScreen.main else { return }
 
-        let content = NSStackView()
-        content.orientation = layout == .horizontal ? .horizontal : .vertical
-        content.alignment = layout == .horizontal ? .centerY : .leading
-        content.spacing = layout == .horizontal ? 2 : 0
-        content.edgeInsets = NSEdgeInsets(top: 5, left: 6, bottom: 5, right: 6)
-
-        let rows = entries.map { entry in
-            let row = BarItemView(entry: entry, layout: layout)
-            row.onPress = { [weak self] in self?.onSelect?(entry.item) }
-            return row
+        let views = entries.map { entry in
+            let view = BarItemView(entry: entry, showsName: mode == .list, fixedWidth: mode == .grid ? 44 : nil)
+            view.onPress = { [weak self] in self?.onSelect?(entry.item) }
+            return view
         }
-        rows.forEach(content.addArrangedSubview)
-        if layout == .vertical, let widest = rows.map(\.fittingSize.width).max() {
-            rows.forEach { $0.widthAnchor.constraint(equalToConstant: widest).isActive = true }
-        }
+        let content = Self.layout(views, mode: mode)
         if let message {
             let label = NSTextField(labelWithString: message)
             label.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
@@ -53,7 +44,7 @@ final class BarController {
         }
 
         let glass = NSGlassEffectView()
-        glass.cornerRadius = layout == .horizontal ? 16 : 12
+        glass.cornerRadius = mode == .bar ? 16 : 14
         glass.contentView = content
 
         let size = content.fittingSize
@@ -84,6 +75,50 @@ final class BarController {
             monitors.append(monitor)
         }
     }
+
+    private static func layout(_ views: [BarItemView], mode: DisplayMode) -> NSStackView {
+        let content = NSStackView()
+        content.edgeInsets = NSEdgeInsets(top: 6, left: 6, bottom: 6, right: 6)
+        switch mode {
+        case .bar, .menuBar:
+            content.orientation = .horizontal
+            content.spacing = 2
+            views.forEach(content.addArrangedSubview)
+        case .list:
+            content.orientation = .vertical
+            content.alignment = .leading
+            content.spacing = 0
+            views.forEach(content.addArrangedSubview)
+            if let widest = views.map(\.fittingSize.width).max() {
+                views.forEach { $0.widthAnchor.constraint(equalToConstant: widest).isActive = true }
+            }
+        case .grid:
+            // As close to square as the count allows: 5 items make a 3 × 2 grid.
+            let columns = max(1, Int(Double(views.count).squareRoot().rounded(.up)))
+            content.orientation = .vertical
+            content.alignment = .leading
+            content.spacing = 4
+            for start in stride(from: 0, to: views.count, by: columns) {
+                let row = NSStackView(views: Array(views[start..<min(start + columns, views.count)]))
+                row.orientation = .horizontal
+                row.spacing = 4
+                content.addArrangedSubview(row)
+            }
+        }
+        return content
+    }
+
+    #if DEBUG
+    /// Screen frames (AppKit coordinates) of the item views, to click them from scripts.
+    var debugItemFrames: [CGRect] {
+        guard let panel, let content = panel.contentView else { return [] }
+        return Self.itemViews(in: content).map { panel.convertToScreen($0.convert($0.bounds, to: nil)) }
+    }
+
+    private static func itemViews(in view: NSView) -> [BarItemView] {
+        view.subviews.flatMap { ($0 as? BarItemView).map { [$0] } ?? itemViews(in: $0) }
+    }
+    #endif
 
     func close() {
         monitors.forEach(NSEvent.removeMonitor)
@@ -123,21 +158,21 @@ private final class BarPanel: NSPanel {
     }
 }
 
-/// One hidden item: an icon cell in the horizontal bar, an icon-and-name row in the vertical list.
+/// One hidden item: an icon cell, or an icon-and-name row in the list.
 private final class BarItemView: NSView {
     var onPress: (() -> Void)?
 
-    private static let height: CGFloat = 28
+    private static let height: CGFloat = 30
     private static let iconSlot: CGFloat = 22
     private static let horizontalPadding: CGFloat = 7
 
     private var isHovered = false { didSet { needsDisplay = true } }
     private var isPressed = false { didSet { needsDisplay = true } }
 
-    init(entry: BarEntry, layout: Settings.BarLayout) {
+    init(entry: BarEntry, showsName: Bool, fixedWidth: CGFloat?) {
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
-        toolTip = layout == .horizontal ? entry.item.displayName : nil
+        toolTip = showsName ? nil : entry.item.displayName
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
         setAccessibilityLabel(entry.item.displayName)
@@ -145,14 +180,17 @@ private final class BarItemView: NSView {
         let imageView = NSImageView()
         imageView.translatesAutoresizingMaskIntoConstraints = false
         imageView.imageScaling = .scaleProportionallyDown
-        let imageSize: NSSize
+        var imageSize: NSSize
         if let image = entry.image {
             imageView.image = image
-            let scale = min(1, (Self.height - 8) / max(image.size.height, 1))
+            let scale = min(1, (Self.height - 10) / max(image.size.height, 1))
             imageSize = NSSize(width: image.size.width * scale, height: image.size.height * scale)
         } else {
             imageView.image = entry.item.appIcon
             imageSize = NSSize(width: 18, height: 18)
+        }
+        if let fixedWidth, imageSize.width > fixedWidth - 8 {
+            imageSize = NSSize(width: fixedWidth - 8, height: imageSize.height * (fixedWidth - 8) / imageSize.width)
         }
         addSubview(imageView)
 
@@ -162,22 +200,24 @@ private final class BarItemView: NSView {
             imageView.widthAnchor.constraint(equalToConstant: imageSize.width),
             imageView.heightAnchor.constraint(equalToConstant: imageSize.height),
             imageView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            imageView.centerXAnchor.constraint(equalTo: leadingAnchor, constant: Self.horizontalPadding + iconWidth / 2),
         ]
-        switch layout {
-        case .horizontal:
-            constraints.append(widthAnchor.constraint(equalToConstant: iconWidth + Self.horizontalPadding * 2))
-        case .vertical:
+        if showsName {
             let label = NSTextField(labelWithString: entry.item.displayName)
             label.translatesAutoresizingMaskIntoConstraints = false
             label.font = .menuFont(ofSize: 0)
             label.lineBreakMode = .byTruncatingTail
             addSubview(label)
             constraints += [
+                imageView.centerXAnchor.constraint(equalTo: leadingAnchor, constant: Self.horizontalPadding + iconWidth / 2),
                 label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.horizontalPadding * 2 + iconWidth),
                 label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Self.horizontalPadding * 2),
                 label.centerYAnchor.constraint(equalTo: centerYAnchor),
                 label.widthAnchor.constraint(lessThanOrEqualToConstant: 320),
+            ]
+        } else {
+            constraints += [
+                imageView.centerXAnchor.constraint(equalTo: centerXAnchor),
+                widthAnchor.constraint(equalToConstant: fixedWidth ?? iconWidth + Self.horizontalPadding * 2),
             ]
         }
         NSLayoutConstraint.activate(constraints)
@@ -191,7 +231,7 @@ private final class BarItemView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         guard isHovered || isPressed else { return }
-        NSColor.labelColor.withAlphaComponent(isPressed ? 0.2 : 0.1).setFill()
+        NSColor.labelColor.withAlphaComponent(isPressed ? 0.22 : 0.1).setFill()
         NSBezierPath(roundedRect: bounds, xRadius: 8, yRadius: 8).fill()
     }
 
@@ -201,14 +241,24 @@ private final class BarItemView: NSView {
     override func mouseDown(with event: NSEvent) { isPressed = true }
 
     override func mouseUp(with event: NSEvent) {
-        isPressed = false
-        if bounds.contains(convert(event.locationInWindow, from: nil)) {
-            onPress?()
+        guard bounds.contains(convert(event.locationInWindow, from: nil)) else {
+            isPressed = false
+            return
         }
+        confirmPress()
     }
 
     override func accessibilityPerformPress() -> Bool {
-        onPress?()
+        confirmPress()
         return true
+    }
+
+    /// Keeps the pressed highlight up for a moment so the click visibly lands before the bar closes.
+    private func confirmPress() {
+        isPressed = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            self?.isPressed = false
+            self?.onPress?()
+        }
     }
 }

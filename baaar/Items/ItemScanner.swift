@@ -6,16 +6,24 @@ import ApplicationServices
 /// On macOS 27 the menu bar is a single WindowServer window, so per-item windows
 /// no longer exist; each app's `AXExtrasMenuBar` is the only public item list.
 enum ItemScanner {
+    enum Scope {
+        /// Every running app.
+        case all
+        /// Only baaar and MenuBarAgent: enough to see baaar's dividers and macOS's overflow chevron, fast.
+        case controls
+    }
+
     private static let queue = DispatchQueue(label: "com.aaangelmartin.baaar.scanner", qos: .userInitiated)
+    private static let menuBarAgent = "com.apple.MenuBarAgent"
 
     /// Scans off the main thread; a slow app only costs its own messaging timeout.
     ///
     /// The main thread must never query baaar's own items: AX requests to our own
     /// process are answered on the main thread, so it would wait on itself.
-    static func scan(onlyOwn: Bool = false) async -> MenuBarSnapshot {
+    static func scan(_ scope: Scope = .all) async -> MenuBarSnapshot {
         let ownPID = ProcessInfo.processInfo.processIdentifier
         let apps = NSWorkspace.shared.runningApplications
-            .filter { !onlyOwn || $0.processIdentifier == ownPID }
+            .filter { scope == .all || $0.processIdentifier == ownPID || $0.bundleIdentifier == menuBarAgent }
             .map { AppRef(pid: $0.processIdentifier, bundleIdentifier: $0.bundleIdentifier, name: $0.localizedName ?? $0.bundleIdentifier ?? "App") }
         return await withCheckedContinuation { continuation in
             queue.async {
@@ -48,7 +56,8 @@ enum ItemScanner {
                 continue
             }
             let label = firstString(of: child, [kAXTitleAttribute, kAXDescriptionAttribute])
-            let key = label ?? firstString(of: child, [kAXHelpAttribute, kAXIdentifierAttribute])
+            let identifier: String? = (AX.value(child, kAXIdentifierAttribute) as String?)?.nilIfEmpty
+            let key = identifier ?? label ?? firstString(of: child, [kAXHelpAttribute])
             let base = "\(app.bundleIdentifier ?? app.name)/\(key ?? "item")"
             let occurrence = occurrences[base, default: 0]
             occurrences[base] = occurrence + 1
@@ -59,6 +68,7 @@ enum ItemScanner {
                 bundleIdentifier: app.bundleIdentifier,
                 appName: app.name,
                 label: label,
+                identifier: identifier,
                 frame: AX.frame(child),
                 isPressable: role == "AXMenuBarItem",
                 isOwn: app.pid == ownPID
@@ -100,22 +110,15 @@ enum AX {
         return names as? [String] ?? []
     }
 
-    @discardableResult
-    static func perform(_ action: String, on element: AXUIElement) -> AXError {
-        AXUIElementPerformAction(element, action as CFString)
-    }
-
-    /// Presses an item without blocking the caller.
+    /// Presses an item and returns once the owning app has handled it.
     ///
-    /// `AXPress` only returns once the target app handles it, and for a status
-    /// item that is when its menu closes, so a timeout (`cannotComplete`) is the
-    /// normal outcome while the menu is still open.
-    static func pressInBackground(_ element: AXElement, id: String) {
-        DispatchQueue.global(qos: .userInitiated).async {
-            AXUIElementSetMessagingTimeout(element.raw, 1)
-            let result = AXUIElementPerformAction(element.raw, kAXPressAction as CFString)
-            if result != .success, result != .cannotComplete {
-                Log.write("press \(id) failed with AXError \(result.rawValue)")
+    /// For a status item with a menu that is when the menu closes, so this can
+    /// take as long as the user keeps the menu open. It runs off the main thread.
+    static func press(_ element: AXElement) async -> AXError {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                AXUIElementSetMessagingTimeout(element.raw, 120)
+                continuation.resume(returning: AXUIElementPerformAction(element.raw, kAXPressAction as CFString))
             }
         }
     }
