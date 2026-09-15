@@ -1,17 +1,15 @@
 import AppKit
 
 /// How much of the menu bar is showing in place.
-enum Reveal: Int, Comparable {
-    /// Hidden and always-hidden items are concealed.
+enum Reveal {
+    /// Hidden and always hidden items are concealed.
     case none
-    /// Only always-hidden items are concealed.
+    /// Hidden items show; always hidden ones stay concealed.
     case hidden
+    /// Always hidden items show; hidden ones stay concealed.
+    case alwaysHidden
     /// Nothing is concealed.
     case all
-
-    static func < (lhs: Reveal, rhs: Reveal) -> Bool {
-        lhs.rawValue < rhs.rawValue
-    }
 }
 
 /// Drives the real menu bar: which items are concealed, opening hidden items, and picturing items.
@@ -129,6 +127,7 @@ final class MenuBarController {
         var concealed: Set<String> = switch reveal {
         case .none: keys(in: [.hidden, .alwaysHidden])
         case .hidden: keys(in: [.alwaysHidden])
+        case .alwaysHidden: keys(in: [.hidden])
         case .all: []
         }
         concealed.formUnion(temporarilyConcealed)

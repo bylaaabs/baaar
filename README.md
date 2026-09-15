@@ -25,7 +25,7 @@ and **always hidden**.
 
 - **Drag bundles between sections** in the layout pane of settings. Everything one bundle puts in the menu bar
   moves together.
-- **Click the chevron** to show hidden items. **⌥-click** it to include always hidden ones.
+- **Click the chevron** to show hidden items. **⌥ or ⌃ click** it to show only the always hidden ones.
   **Right-click** it for its menu.
 - **Pick how hidden items appear**: in the menu bar itself, a horizontal bar, a vertical list or a grid.
 - **Click an item** in the bar, list or grid: baaar shows it in the menu bar for a moment, opens its
@@ -74,7 +74,7 @@ Details in [docs/PERMISSIONS.md](docs/PERMISSIONS.md).
 
 ## Install
 
-No release yet. The first one will be `0.4.0-alpha.1`, as a notarized DMG and a Homebrew cask in
+No release yet. The first one will be `0.1.0`, as a notarized DMG and a Homebrew cask in
 [bylaaabs/homebrew-tap](https://github.com/bylaaabs/homebrew-tap). Until then, build from source.
 
 ## Build from source

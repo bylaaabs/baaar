@@ -147,7 +147,7 @@ template there.
 
 ## Releasing
 
-Only the maintainer cuts releases, tagged `vX.Y.Z-alpha.N`. The first one is `0.4.0-alpha.1`. If your
+Only the maintainer cuts releases, tagged `vX.Y.Z-alpha.N`. The first one is `0.1.0`. If your
 change needs to ship in the next version, say so in the pull request.
 
 ## License

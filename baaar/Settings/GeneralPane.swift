@@ -67,7 +67,7 @@ struct GeneralPane: View {
                 .brandCard()
             }
 
-            Text("click the chevron to show hidden items. ⌥-click it, or pick show all in its menu, to include always hidden ones. the baaar icon opens this window.")
+            Text("click the chevron to show hidden items. ⌥ or ⌃ click it, or pick show always hidden items in its menu, to see only the always hidden ones. right-click it for the menu.")
                 .font(.brandCaption)
                 .foregroundStyle(BrandColors.onTertiary)
                 .fixedSize(horizontal: false, vertical: true)

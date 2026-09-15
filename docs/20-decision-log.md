@@ -53,7 +53,7 @@ codebase was first built.
 | 2026-09-15 | The product name is lowercase `baaar` | this file |
 | 2026-09-15 | Apache License 2.0 | this file |
 | 2026-09-15 | A new `bylaaabs/baaar`, with the old repository archived as `baaar-legacy` | this file |
-| 2026-09-15 | The first release is `0.4.0-alpha.1` | this file |
+| 2026-09-16 | The first release is `0.1.0` | this file |
 
 ### 2026-09-15 - Hide through MenuBarAgent's visibility restriction
 
@@ -188,15 +188,16 @@ Homebrew cask points at release assets of the old name and has to move with the 
 
 **What would reverse it.** Nothing.
 
-### 2026-09-15 - The first release is `0.4.0-alpha.1`
+### 2026-09-16 - The first release is `0.1.0`
 
 **Context.** The legacy baaar cask stopped at `0.3.0-alpha.5`, and the cask keeps the same token.
 
-**Decision.** Continue the version line: `0.4.0-alpha.1`.
+**Decision.** Start a new version line at `0.1.0`: this is a new codebase for macOS 27, not a continuation.
 
-**What decided it.** Homebrew compares versions, so a lower number would never reach anyone with the
-legacy cask installed.
+**What decided it.** The legacy alpha had no known users outside the studio, and a clean version line
+reads honestly for a rewrite.
 
-**What it costs.** Nothing.
+**What it costs.** Homebrew compares versions, so anyone with the legacy cask installed has to reinstall
+the cask instead of upgrading.
 
 **What would reverse it.** Nothing.

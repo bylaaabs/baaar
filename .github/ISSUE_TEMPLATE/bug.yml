@@ -24,7 +24,7 @@ body:
     attributes:
       label: Where
       description: macOS build, baaar version and build, display mode, and whether Screen Recording is granted.
-      placeholder: "macOS 27.0 / baaar 0.4.0-alpha.1 (1) / grid / Screen Recording granted"
+      placeholder: "macOS 27.0 / baaar 0.1.0 (1) / grid / Screen Recording granted"
     validations: {required: true}
   - type: textarea
     id: diagnostics

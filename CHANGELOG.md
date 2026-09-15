@@ -4,7 +4,7 @@ All notable changes to baaar are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The first release of this codebase will be
-`0.4.0-alpha.1`, after the legacy baaar's last cask, `0.3.0-alpha.5`.
+`0.1.0`.
 
 ## [Unreleased]
 
@@ -16,7 +16,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The first release
 - Three sections, visible, hidden and always hidden, assigned per bundle. Apple's nine system items
   (battery, Bluetooth, clock, displays, keyboard brightness, sound, Wi-Fi, screen mirroring and
   Control Center) are placed one by one.
-- The chevron: click it to show hidden items, ⌥-click it to include always hidden ones, right-click it
+- The chevron: click it to show hidden items, ⌥ or ⌃ click it to show only always hidden ones, right-click it
   for its menu. Five styles: chevron, arrow, triangle, circle and dots.
 - Four ways to show hidden items: in the menu bar itself, a horizontal bar, a vertical list or a grid
   under the chevron.

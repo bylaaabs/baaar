@@ -20,19 +20,16 @@ struct AboutPane: View {
                 .textSelection(.enabled)
 
             VStack(spacing: 8) {
-                BrandLink(title: "github.com/bylaaabs/baaar", url: "https://github.com/bylaaabs/baaar")
-                Spacer(minLength: 0).frame(height: 8)
-                BrandLink(title: "hello@laaabs.com", url: "mailto:hello@laaabs.com")
                 BrandLink(title: "laaabs.com", url: "https://laaabs.com")
-                Spacer(minLength: 0).frame(height: 8)
-                BrandLink(title: "aaangelmartin.com", url: "https://aaangelmartin.com")
+                BrandLink(title: "github.com/bylaaabs/baaar", url: "https://github.com/bylaaabs/baaar")
+                BrandLink(title: "hello@laaabs.com", url: "mailto:hello@laaabs.com")
             }
             .padding(.top, 6)
 
             Spacer(minLength: 16)
 
             BrandBadge(text: "credits", tint: BrandColors.onTertiary)
-            Text("built on macOS 27's menubaragent visibility restriction.")
+            Text("set in outfit, by the outfit project authors, under the sil open font license.")
                 .font(.brandCaption)
                 .foregroundStyle(BrandColors.onSecondary)
                 .multilineTextAlignment(.center)

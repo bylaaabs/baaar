@@ -82,11 +82,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Clicks
 
-    /// Status item actions fire on mouse up; anything else (VoiceOver, a stale event) counts as a primary click.
+    /// A right click opens the menu. Status item actions fire on mouse up; anything else (VoiceOver, a stale event) is a primary click.
     private static func isSecondaryClick(_ event: NSEvent?) -> Bool {
         guard let event else { return false }
         return event.type == .rightMouseUp || event.type == .rightMouseDown
-            || (event.type == .leftMouseUp && (event.modifierFlags.contains(.control) || NSEvent.modifierFlags.contains(.control)))
+    }
+
+    /// ⌥ or ⌃ held while clicking the chevron. MenuBarAgent forwards status item clicks and the
+    /// forwarded event may not carry modifiers, so the keyboard state is read as well.
+    private static func wantsAlwaysHidden(_ event: NSEvent?) -> Bool {
+        let flags = NSEvent.modifierFlags.union(event?.modifierFlags ?? [])
+        return flags.contains(.option) || flags.contains(.control)
     }
 
     private func appIconClicked(_ event: NSEvent?) {
@@ -115,42 +121,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         // MenuBarAgent forwards status item clicks, and the forwarded event may not carry modifiers; read the keyboard instead.
-        let includeAlwaysHidden = NSEvent.modifierFlags.contains(.option) || event?.modifierFlags.contains(.option) == true
-        showHiddenItems(includeAlwaysHidden: includeAlwaysHidden)
+        showHiddenItems(alwaysHidden: Self.wantsAlwaysHidden(event))
     }
 
     /// Shows hidden items the way the user chose: in place, or in a bar, list or grid.
-    private func showHiddenItems(includeAlwaysHidden: Bool) {
+    private func showHiddenItems(alwaysHidden: Bool) {
         switch Settings.displayMode {
         case .menuBar:
-            controller.setReveal(includeAlwaysHidden ? .all : .hidden)
+            controller.setReveal(alwaysHidden ? .alwaysHidden : .hidden)
             controller.startRehideMonitor()
         case .bar, .list, .grid:
             guard Permissions.hasAccessibility else {
                 settingsWindow.show(pane: .permissions)
                 return
             }
-            openPanel(includeAlwaysHidden: includeAlwaysHidden)
+            openPanel(alwaysHidden: alwaysHidden)
         }
     }
 
     // MARK: - Panel
 
     /// Opens straight from the last scan, then refreshes it in the background.
-    private func openPanel(includeAlwaysHidden: Bool) {
-        let sections: Set<MenuBarSection> = includeAlwaysHidden ? [.hidden, .alwaysHidden] : [.hidden]
-        presentPanel(items: controller.items(in: sections), snapshot: controller.snapshot)
+    /// Hidden items, or with `alwaysHidden` only the always hidden ones.
+    private func openPanel(alwaysHidden: Bool) {
+        let sections: Set<MenuBarSection> = alwaysHidden ? [.alwaysHidden] : [.hidden]
+        presentPanel(items: controller.items(in: sections), snapshot: controller.snapshot, alwaysHidden: alwaysHidden)
         Task {
             let fresh = await controller.refreshSnapshot()
             let items = controller.items(in: sections, from: fresh)
             guard bar.isVisible, items.map(\.id) != bar.shownItemIDs else { return }
-            presentPanel(items: items, snapshot: fresh)
+            presentPanel(items: items, snapshot: fresh, alwaysHidden: alwaysHidden)
         }
     }
 
-    private func presentPanel(items: [MenuBarItem], snapshot: MenuBarSnapshot) {
+    private func presentPanel(items: [MenuBarItem], snapshot: MenuBarSnapshot, alwaysHidden: Bool) {
         let entries = items.map { BarEntry(item: $0, image: controller.images.image(for: $0)) }
-        let message = entries.isEmpty ? "nothing hidden yet - open settings to hide items" : nil
+        let message = entries.isEmpty ? (alwaysHidden ? "nothing always hidden - drag items there in settings" : "nothing hidden yet - open settings to hide items") : nil
         bar.show(entries: entries, message: message, mode: Settings.displayMode, anchor: Self.ownFrame(ControlItems.Identifier.chevron, in: snapshot), screen: controls.screen, appearance: controls.menuBarAppearance)
         controller.isPanelOpen = true
     }
@@ -169,7 +175,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         if controller.reveal == .none {
             addItem(to: menu, "show hidden items", #selector(menuShowHidden))
-            addItem(to: menu, "show all items", #selector(menuShowAll))
+            addItem(to: menu, "show always hidden items", #selector(menuShowAll))
         } else {
             addItem(to: menu, "hide items", #selector(menuHide))
         }
@@ -177,16 +183,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         addItem(to: menu, "settings…", #selector(menuSettings), key: ",")
         addItem(to: menu, "quit baaar", #selector(NSApplication.terminate(_:)), key: "q").target = NSApp
 
-        guard let anchor = Self.ownFrame(identifier, in: controller.snapshot), let screen = controls.screen else {
-            if let button = (identifier == ControlItems.Identifier.app ? controls.appItem : controls.chevronItem).button {
-                menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.maxY + 4), in: button)
-            }
-            return
-        }
-        // With no view the location is in screen coordinates and marks the menu's top-left corner.
-        // It must sit below the menu bar, or AppKit clips the menu and adds a scroll arrow.
-        let top = min(anchor.minY, screen.visibleFrame.maxY) - 2
-        menu.popUp(positioning: nil, at: NSPoint(x: anchor.midX - menu.size.width / 2, y: top), in: nil)
+        // Let AppKit place the menu under its status item, as for any menu bar menu: a menu popped
+        // up at a computed point can land inside the menu bar and grow a scroll arrow.
+        let item = identifier == ControlItems.Identifier.app ? controls.appItem : controls.chevronItem
+        item.menu = menu
+        item.button?.performClick(nil)
+        item.menu = nil
     }
 
     @discardableResult
@@ -197,11 +199,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func menuShowHidden() {
-        showHiddenItems(includeAlwaysHidden: false)
+        showHiddenItems(alwaysHidden: false)
     }
 
     @objc private func menuShowAll() {
-        showHiddenItems(includeAlwaysHidden: true)
+        showHiddenItems(alwaysHidden: true)
     }
 
     @objc private func menuHide() {
@@ -230,12 +232,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func listenForDebugCommands() {
         let commands: [String: @MainActor (AppDelegate, String?) async -> Void] = [
             "reveal": { app, argument in
-                let reveal: Reveal = switch argument { case "all": .all; case "hidden": .hidden; default: .none }
+                let reveal: Reveal = switch argument { case "all": .all; case "hidden": .hidden; case "alwaysHidden": .alwaysHidden; default: .none }
                 app.controller.setReveal(reveal)
             },
             "chevron": { app, _ in app.chevronClicked(nil) },
             "showall": { app, _ in app.menuShowAll() },
-            "panel": { app, argument in app.openPanel(includeAlwaysHidden: argument == "all") },
+            "panel": { app, argument in app.openPanel(alwaysHidden: argument == "alwaysHidden") },
             "close": { app, _ in app.bar.close() },
             "menu": { app, argument in app.showMenu(under: argument == "app" ? ControlItems.Identifier.app : ControlItems.Identifier.chevron) },
             "mode": { app, argument in app.model.displayMode = DisplayMode(rawValue: argument ?? "") ?? .bar },

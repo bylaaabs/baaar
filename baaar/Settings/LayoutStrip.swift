@@ -49,7 +49,7 @@ struct LayoutStrip: View {
         switch section {
         case .visible: "always in the menu bar."
         case .hidden: "shown when you click the chevron."
-        case .alwaysHidden: "shown when you ⌥-click the chevron."
+        case .alwaysHidden: "shown when you ⌥ or ⌃ click the chevron."
         }
     }
 

@@ -168,7 +168,8 @@ and with Screen Recording both granted and denied when the change touches pictur
   | `section` | `<bundle id>:<visible, hidden or alwaysHidden>` | moves a bundle to a section |
   | `press` | a bundle id or item id | opens that item |
   | `clickentry` | an index | clicks that entry of the open panel |
-  | `optionclick` | | ⌥-clicks the chevron |
+  | `arrange` | `<layout id>\|<section>\|<index>` | writes the arrangement a drop in the layout editor would |
+  | `layoutaccess`, `layoutread`, `layoutentries` | | asks for the layout table, logs its weights, logs the editor's items |
   | `escape` | | sends Escape |
 
   Post one from a shell:
@@ -255,6 +256,6 @@ The full workflow (merge method, sizes, releases) is in [CONTRIBUTING.md](CONTRI
 
 ## Versioning
 
-SemVer with alpha tags: `vX.Y.Z-alpha.N`. The legacy baaar cask stopped at `0.3.0-alpha.5`, so this
-codebase's first release is `0.4.0-alpha.1`. Every change a person can notice gets a line under
+SemVer, with alpha tags `vX.Y.Z-alpha.N` when needed. This codebase starts a new version line: its
+first release is `0.1.0`. Every change a person can notice gets a line under
 `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md).
