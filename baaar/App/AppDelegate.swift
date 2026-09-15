@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         Settings.migrateFromLegacyDomain()
         Settings.migrateLegacySections()
+        MenuBarLayoutTable.restoreAccess()
         controller = MenuBarController(controls: ControlItems())
         model.controller = controller
         settingsWindow = SettingsWindowController(model: model)
@@ -163,27 +164,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Menu
 
+    /// The status item menu keeps only quick actions; everything else lives in settings.
     private func showMenu(under identifier: String) {
         let menu = NSMenu()
         if controller.reveal == .none {
-            addItem(to: menu, "Show Hidden Items", #selector(menuShowHidden))
-            addItem(to: menu, "Show All Items", #selector(menuShowAll))
+            addItem(to: menu, "show hidden items", #selector(menuShowHidden))
+            addItem(to: menu, "show all items", #selector(menuShowAll))
         } else {
-            addItem(to: menu, "Hide Items", #selector(menuHide))
+            addItem(to: menu, "hide items", #selector(menuHide))
         }
         menu.addItem(.separator())
-
-        let modeMenu = NSMenu()
-        for mode in DisplayMode.allCases {
-            let item = addItem(to: modeMenu, mode.title, #selector(menuSelectMode(_:)))
-            item.representedObject = mode.rawValue
-            item.state = Settings.displayMode == mode ? .on : .off
-        }
-        menu.addItem(withTitle: "Show Hidden Items As", action: nil, keyEquivalent: "").submenu = modeMenu
-        addItem(to: menu, "Refresh Icons", #selector(menuRefreshImages))
-        addItem(to: menu, "Settings…", #selector(menuSettings), key: ",")
-        menu.addItem(.separator())
-        addItem(to: menu, "Quit baaar", #selector(NSApplication.terminate(_:)), key: "q").target = NSApp
+        addItem(to: menu, "settings…", #selector(menuSettings), key: ",")
+        addItem(to: menu, "quit baaar", #selector(NSApplication.terminate(_:)), key: "q").target = NSApp
 
         guard let anchor = Self.ownFrame(identifier, in: controller.snapshot), let screen = controls.screen else {
             if let button = (identifier == ControlItems.Identifier.app ? controls.appItem : controls.chevronItem).button {
@@ -270,15 +262,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 if let saved { CGWarpMouseCursorPosition(saved) }
             },
-            "optionclick": { app, _ in
-                guard let frame = AppDelegate.ownFrame(ControlItems.Identifier.chevron, in: app.controller.snapshot),
-                      let primaryHeight = NSScreen.screens.first?.frame.height else { return }
-                let point = CGPoint(x: frame.midX, y: primaryHeight - frame.midY)
-                for type in [CGEventType.leftMouseDown, .leftMouseUp] {
-                    let event = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: .left)
-                    event?.flags = .maskAlternate
-                    event?.post(tap: .cghidEventTap)
-                }
+            "layoutaccess": { _, _ in
+                Log.write("layout table access: \(MenuBarLayoutTable.requestAccess())")
+            },
+            "layoutread": { _, _ in
+                let positions = MenuBarLayoutTable.positions()
+                Log.write("layout table readable=\(positions != nil)\n" + (positions ?? [:]).sorted { $0.value > $1.value }.map { "  \($0.value)  \($0.key)" }.joined(separator: "\n"))
+            },
+            // "<id a>|<id b>": swaps two items' weights.
+            "layoutswap": { _, argument in
+                let ids = (argument ?? "").split(separator: "|").map(String.init)
+                guard ids.count == 2, let positions = MenuBarLayoutTable.positions(),
+                      let a = positions[ids[0]], let b = positions[ids[1]] else { Log.write("layoutswap: unknown ids"); return }
+                MenuBarLayoutTable.setPositions([ids[0]: b, ids[1]: a])
             },
             "escape": { _, _ in
                 for keyDown in [true, false] {

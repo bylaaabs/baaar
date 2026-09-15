@@ -43,6 +43,10 @@ final class AppModel {
         }
     }
 
+    var barColor: BarColor {
+        didSet { Settings.barColor = barColor }
+    }
+
     var chevronStyle: ChevronStyle {
         didSet {
             guard chevronStyle != oldValue else { return }
@@ -72,6 +76,7 @@ final class AppModel {
     init() {
         displayMode = Settings.displayMode
         chevronStyle = Settings.chevronStyle
+        barColor = Settings.barColor
         newAppSection = Settings.newAppSection
         autoRehide = Settings.autoRehide
         launchesAtLogin = Settings.launchesAtLogin

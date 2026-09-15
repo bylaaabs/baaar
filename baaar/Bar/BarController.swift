@@ -37,8 +37,10 @@ final class BarController {
         let anchorScreen = anchor.flatMap { anchor in NSScreen.screens.first { $0.frame.contains(NSPoint(x: anchor.midX, y: anchor.midY)) } }
         guard let screen = anchorScreen ?? screen ?? NSScreen.main else { return }
 
+        let color = Settings.barColor
+        let palette = BarPalette(color)
         let views = entries.map { entry in
-            let view = BarItemView(entry: entry, showsName: mode == .list, fixedWidth: mode == .grid ? 44 : nil)
+            let view = BarItemView(entry: entry, showsName: mode == .list, fixedWidth: mode == .grid ? 44 : nil, palette: palette, tintsIcons: color.tintsIcons)
             view.onPress = { [weak self] in self?.onSelect?(entry.item) }
             return view
         }
@@ -46,7 +48,7 @@ final class BarController {
         if let message {
             let label = NSTextField(labelWithString: message.lowercased())
             label.font = .brandCaption
-            label.textColor = BrandColors.nsOnSecondary
+            label.textColor = palette.secondary
             content.addArrangedSubview(label)
             if views.isEmpty {
                 content.edgeInsets = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
@@ -72,8 +74,8 @@ final class BarController {
         )
 
         let panel = BarPanel(contentRect: frame)
-        panel.appearance = NSAppearance(named: .darkAqua)
-        panel.contentView = BarContainerView(content: content)
+        panel.appearance = NSAppearance(named: color == .white ? .aqua : .darkAqua)
+        panel.contentView = BarContainerView(content: content, palette: palette)
         panel.onCancel = { [weak self] in self?.close() }
         panel.alphaValue = 0
         panel.makeKeyAndOrderFront(nil)
@@ -184,9 +186,9 @@ private final class BarContainerView: NSView {
     /// stops at the 6 pt gap under the menu bar, so the panel never covers the chevron.
     static let shadowInsets = NSEdgeInsets(top: 6, left: 18, bottom: 22, right: 18)
 
-    init(content: NSView) {
+    init(content: NSView, palette: BarPalette) {
         super.init(frame: .zero)
-        let surface = BarSurfaceView()
+        let surface = BarSurfaceView(palette: palette)
         surface.translatesAutoresizingMaskIntoConstraints = false
         addSubview(surface)
         surface.addSubview(content)
@@ -222,7 +224,10 @@ private final class BarContainerView: NSView {
 private final class BarSurfaceView: NSView {
     private static let cornerRadius: CGFloat = 9
 
-    init() {
+    private let palette: BarPalette
+
+    init(palette: BarPalette) {
+        self.palette = palette
         super.init(frame: .zero)
         wantsLayer = true
         layerContentsRedrawPolicy = .onSetNeedsDisplay
@@ -238,10 +243,10 @@ private final class BarSurfaceView: NSView {
     override func updateLayer() {
         guard let layer else { return }
         let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
-        layer.backgroundColor = BrandColors.nsSurfaceElevated.cgColor
+        layer.backgroundColor = palette.background.cgColor
         layer.cornerRadius = Self.cornerRadius
         layer.borderWidth = 1 / scale
-        layer.borderColor = BrandColors.nsSeparatorSolid.cgColor
+        layer.borderColor = palette.ring.cgColor
         layer.shadowColor = NSColor.black.cgColor
         layer.shadowOpacity = 0.35
         layer.shadowRadius = 12
@@ -270,7 +275,10 @@ private final class BarItemView: NSView {
     private var isHovered = false { didSet { if isHovered != oldValue { needsDisplay = true } } }
     private var isPressed = false { didSet { if isPressed != oldValue { needsDisplay = true } } }
 
-    init(entry: BarEntry, showsName: Bool, fixedWidth: CGFloat?) {
+    private let palette: BarPalette
+
+    init(entry: BarEntry, showsName: Bool, fixedWidth: CGFloat?, palette: BarPalette, tintsIcons: Bool) {
+        self.palette = palette
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         toolTip = showsName ? nil : entry.item.displayName
@@ -283,7 +291,14 @@ private final class BarItemView: NSView {
         imageView.imageScaling = .scaleProportionallyDown
         var imageSize: NSSize
         if let image = entry.image {
-            imageView.image = image
+            if tintsIcons, let glyph = image.copy() as? NSImage {
+                // On a light bar the captured white glyphs would vanish: draw their shape in the bar's ink instead.
+                glyph.isTemplate = true
+                imageView.image = glyph
+                imageView.contentTintColor = palette.foreground
+            } else {
+                imageView.image = image
+            }
             let scale = min(1, (Self.height - 10) / max(image.size.height, 1))
             imageSize = NSSize(width: image.size.width * scale, height: image.size.height * scale)
         } else if let icon = entry.item.appIcon {
@@ -293,7 +308,7 @@ private final class BarItemView: NSView {
             // Apple's items have no app icon; show their symbol until they're pictured.
             let symbol = NSImage(systemSymbolName: entry.item.systemItem?.symbolName ?? "questionmark.square.dashed", accessibilityDescription: entry.item.displayName)
             imageView.image = symbol?.withSymbolConfiguration(.init(pointSize: 14, weight: .medium))
-            imageView.contentTintColor = BrandColors.nsOn
+            imageView.contentTintColor = palette.foreground
             imageSize = NSSize(width: 18, height: 18)
         }
         if let fixedWidth, imageSize.width > fixedWidth - 8 {
@@ -312,7 +327,7 @@ private final class BarItemView: NSView {
             let label = NSTextField(labelWithString: entry.item.displayName)
             label.translatesAutoresizingMaskIntoConstraints = false
             label.font = .brandBody
-            label.textColor = BrandColors.nsOn
+            label.textColor = palette.foreground
             label.lineBreakMode = .byTruncatingTail
             addSubview(label)
             constraints += [
@@ -340,7 +355,7 @@ private final class BarItemView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         guard isHovered || isPressed else { return }
         // surfaceSelected on hover, one rung up (separator) while pressed.
-        (isPressed ? BrandColors.nsSeparator : BrandColors.nsSurfaceSelected).setFill()
+        (isPressed ? palette.pressed : palette.hover).setFill()
         NSBezierPath(roundedRect: bounds, xRadius: 6, yRadius: 6).fill()
     }
 

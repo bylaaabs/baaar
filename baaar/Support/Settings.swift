@@ -132,6 +132,21 @@ enum SystemItem: Int, CaseIterable, Sendable {
     }
 }
 
+/// The bar, list and grid background, from the laaabs. palette.
+enum BarColor: String, CaseIterable, Sendable {
+    case black
+    case graphite
+    case cyan
+    case white
+
+    var title: String { rawValue }
+
+    /// Light surfaces draw item pictures as one-colour glyphs, so captured white icons stay legible.
+    var tintsIcons: Bool {
+        self == .cyan || self == .white
+    }
+}
+
 @MainActor
 enum Settings {
     private static let defaults = UserDefaults.standard
@@ -142,6 +157,11 @@ enum Settings {
         static let autoRehide = "autoRehide"
         static let didOnboard = "didOnboard"
         static let legacyItemSections = "itemSections"
+    }
+
+    static var barColor: BarColor {
+        get { defaults.string(forKey: "barColor").flatMap(BarColor.init(rawValue:)) ?? .black }
+        set { defaults.set(newValue.rawValue, forKey: "barColor") }
     }
 
     static var chevronStyle: ChevronStyle {

@@ -78,6 +78,43 @@ enum BrandColors {
     static let nsSurfaceSelected = NSColor.white.withAlphaComponent(0.08)
     static let nsSeparator = NSColor.white.withAlphaComponent(0.12)
     static let nsShadowOverlay = NSColor.black.withAlphaComponent(0.35)
+    static let nsSurfaceHigh = NSColor(srgbRed: 0x1A / 255, green: 0x1A / 255, blue: 0x1A / 255, alpha: 1)
+    static let nsBorderSolid = NSColor(srgbRed: 0x3B / 255, green: 0x3B / 255, blue: 0x3B / 255, alpha: 1)
+    static let nsAccentDeep = NSColor(displayP3Red: 0x00 / 255, green: 0x9E / 255, blue: 0xC5 / 255, alpha: 1)
+}
+
+/// How the bar, list and grid are painted for each `BarColor`.
+struct BarPalette {
+    let background: NSColor
+    let ring: NSColor
+    let foreground: NSColor
+    let secondary: NSColor
+    let hover: NSColor
+    let pressed: NSColor
+
+    init(_ color: BarColor) {
+        switch color {
+        case .black:
+            background = BrandColors.nsSurface
+            ring = BrandColors.nsSeparatorSolid
+            foreground = BrandColors.nsOn
+        case .graphite:
+            background = BrandColors.nsSurfaceHigh
+            ring = BrandColors.nsBorderSolid
+            foreground = BrandColors.nsOn
+        case .cyan:
+            background = BrandColors.nsAccent
+            ring = BrandColors.nsAccentDeep
+            foreground = BrandColors.nsSurface
+        case .white:
+            background = NSColor.white
+            ring = NSColor.black.withAlphaComponent(0.12)
+            foreground = BrandColors.nsSurface
+        }
+        secondary = foreground.withAlphaComponent(0.55)
+        hover = foreground.withAlphaComponent(0.08)
+        pressed = foreground.withAlphaComponent(0.16)
+    }
 }
 
 extension Color {

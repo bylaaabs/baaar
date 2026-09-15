@@ -20,6 +20,19 @@ struct GeneralPane: View {
                 }
             }
 
+            BrandBlock("bar color") {
+                BrandRow("color", detail: "the bar, list and grid use one of the laaabs. colors. on cyan and white, icons are drawn in black.") {
+                    HStack(spacing: 10) {
+                        ForEach(BarColor.allCases, id: \.self) { color in
+                            BarColorSwatch(color: color, isSelected: model.barColor == color) {
+                                model.barColor = color
+                            }
+                        }
+                    }
+                }
+                .brandCard()
+            }
+
             BrandBlock("chevron") {
                 VStack(alignment: .leading, spacing: 16) {
                     BrandRow("icon", detail: "points where hidden items appear: sideways in the menu bar, down for the bar, list and grid.") {
@@ -188,5 +201,36 @@ private struct DisplayModePreview: View {
 
     private var hiddenDot: some View {
         Circle().fill(hiddenColor).frame(width: dot, height: dot)
+    }
+}
+
+/// A round swatch for one of the bar colors, ringed in cyan when selected.
+private struct BarColorSwatch: View {
+    let color: BarColor
+    let isSelected: Bool
+    let action: () -> Void
+
+    private var fill: Color {
+        switch color {
+        case .black: BrandColors.surface
+        case .graphite: BrandColors.surfaceHigh
+        case .cyan: BrandColors.accent
+        case .white: .white
+        }
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Circle()
+                .fill(fill)
+                .overlay(Circle().strokeBorder(BrandColors.borderSolid, lineWidth: 1))
+                .frame(width: 22, height: 22)
+                .padding(3)
+                .overlay(Circle().strokeBorder(isSelected ? BrandColors.accent : .clear, lineWidth: 2))
+        }
+        .buttonStyle(.plain)
+        .help(color.title)
+        .accessibilityLabel(color.title)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
