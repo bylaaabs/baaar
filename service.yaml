@@ -1,0 +1,10 @@
+# service.yaml - what this repo is. must agree with infra/map/services.yaml; ci runs
+# `node infra/scripts/check.mjs service.yaml`. schema and examples: infra/schema/service.yaml.
+name: baaar
+hostname: null
+kind: product
+language: swift
+build: see scripts/
+deploy: github release from .github/workflows/release.yml, then the homebrew cask
+runs_on: null
+owner: product
