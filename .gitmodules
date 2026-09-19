@@ -1,3 +1,6 @@
 [submodule "infra"]
 	path = infra
 	url = https://github.com/bylaaabs/infra.git
+[submodule "brand"]
+	path = brand
+	url = https://github.com/bylaaabs/brand.git
