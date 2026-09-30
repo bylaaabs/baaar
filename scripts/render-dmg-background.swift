@@ -47,8 +47,11 @@ let onSecondary = CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.55)
 let onTertiary = CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.30)
 
 let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-let fontURL = root.appending(path: "baaar/Resources/Fonts/Outfit-Variable.ttf")
-let wordmarkURL = root.appending(path: "baaar/Assets.xcassets/Wordmark.imageset/wordmark.svg")
+// outfit from the kit's checkout, which scripts/build.sh leaves in its derived data (OUTFIT=<path> to read it elsewhere)
+let fontURL = ProcessInfo.processInfo.environment["OUTFIT"].map { URL(filePath: $0) } ?? FileManager.default.homeDirectoryForCurrentUser
+    .appending(path: "Library/Developer/Xcode/DerivedData/baaar-cli/SourcePackages/checkouts/ui-swift/Sources/LaaabsKit/Resources/Fonts/Outfit-Variable.ttf")
+// the mark from the brand submodule
+let wordmarkURL = root.appending(path: "brand/baaar/vector/baaar.svg")
 let outputURL = root.appending(path: "Resources/dmg-background.png")
 
 // MARK: - Font

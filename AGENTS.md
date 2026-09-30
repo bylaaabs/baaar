@@ -57,6 +57,11 @@ No design value is ever invented. Every color, opacity, typeface, size, spacing,
 timing comes from [design/DESIGN-SYSTEM.md](design/DESIGN-SYSTEM.md). If a value is missing, add it to
 the design system first, then use it.
 
+The look itself (colours, fonts, the controls, the menus, the window chrome, the mark) comes from the
+swift kit, bylaaabs/ui-swift (`LaaabsKit`), pinned in `project.yml` and exported in
+`baaar/App/Kit.swift`. Never restyle it here: change the kit and bump the pin. `BarPalette`
+(`baaar/Bar/`) is baaar's own, because it is about the bar.
+
 Two colors do the work: the cyan accent `#00B5E2` and black. Everything else is the white-opacity
 ladder. No tinted glass, glows, gradients or decorative shadows.
 
@@ -101,8 +106,7 @@ longer hold. baaar is built on what still works:
 | `baaar/Bar/` | the floating bar, list and grid |
 | `baaar/Settings/` | the settings window and its panes |
 | `baaar/Support/` | `Settings` (UserDefaults), `Permissions`, `Log`, `Diagnostics` |
-| `baaar/Theme/` | design tokens and brand components, from `design/` |
-| `baaar/Resources/` | `Localizable.xcstrings` and `InfoPlist.xcstrings` (English and Spanish), fonts |
+| `baaar/Resources/` | `Localizable.xcstrings` and `InfoPlist.xcstrings` (English and Spanish) |
 | `design/` | the design system and the Icon Composer icon `design/icon/baaar.icon` |
 | `docs/` | architecture, permissions, privacy, decision log |
 | `scripts/` | `build.sh`, `render-icon-glyph.swift` (redraws the icon glyph) |
