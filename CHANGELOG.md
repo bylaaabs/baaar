@@ -8,6 +8,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The first release
 
 ## [Unreleased]
 
+### Changed
+
+- The app icon is the baaar wordmark, white on black, like caaapture's and taaab's, instead of the chevron and three dots.
+
 ## [0.1.0] - 2026-09-16
 
 The first release of baaar for macOS 27.
