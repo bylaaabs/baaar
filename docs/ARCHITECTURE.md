@@ -13,8 +13,7 @@ baaar/Capture/    ItemImageCache
 baaar/Bar/        BarController: the bar, list and grid
 baaar/Settings/   the settings window and its panes
 baaar/Support/    Settings (UserDefaults), Permissions, Log, Diagnostics
-baaar/Theme/      design tokens and brand components
-baaar/Resources/  string catalogs (English and Spanish), fonts
+baaar/Resources/  string catalogs (English and Spanish)
 ```
 
 ## The pieces
@@ -81,5 +80,6 @@ login), and the private `MenuBarClientCore`. Why the private one:
 
 ## Bundled resources
 
-The Outfit variable font (`baaar/Resources/Fonts/Outfit-Variable.ttf`), licensed under the SIL Open
-Font License 1.1.
+None of its own for the look: the Outfit variable font (SIL Open Font License 1.1, the licence ships
+with it) and the marks come from the swift kit, bylaaabs/ui-swift, which Xcode bundles into the app
+as `LaaabsKit_LaaabsKit.bundle`.

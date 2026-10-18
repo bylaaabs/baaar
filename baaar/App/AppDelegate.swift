@@ -18,6 +18,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller = MenuBarController(controls: ControlItems())
         model.controller = controller
         settingsWindow = SettingsWindowController(model: model)
+        #if DEBUG
+        if let index = CommandLine.arguments.firstIndex(of: "--render-settings"), CommandLine.arguments.count > index + 1 {
+            let folder = URL(filePath: CommandLine.arguments[index + 1])
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            settingsWindow.renderPanes(to: folder)
+            exit(0)
+        }
+        #endif
         controls.onAppClick = { [weak self] event in self?.appIconClicked(event) }
         controls.onChevronClick = { [weak self] event in self?.chevronClicked(event) }
         bar.onSelect = { [weak self] item in

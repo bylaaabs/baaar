@@ -7,6 +7,7 @@
 #   VERSION                   overrides MARKETING_VERSION from project.yml
 #   DEVELOPER_ID_APPLICATION  signing identity (default "Developer ID Application";
 #                             "-" signs ad-hoc for a local dry run)
+#   TEAM_ID                   the apple team (default 3862GT8D5W); the kit's resource bundle needs it
 #   DERIVED_DATA              build folder, outside the repository (see lib.sh)
 #   DIST                      output folder (default dist/)
 #
@@ -53,6 +54,7 @@ if ! xcodebuild \
   CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
   CODE_SIGN_STYLE=Manual \
   CODE_SIGN_IDENTITY="$SIGN_IDENTITY" \
+  DEVELOPMENT_TEAM="${TEAM_ID:-3862GT8D5W}" \
   ENABLE_HARDENED_RUNTIME=YES \
   OTHER_CODE_SIGN_FLAGS="${OTHER_CODE_SIGN_FLAGS:---timestamp}" \
   > "$LOG" 2>&1; then

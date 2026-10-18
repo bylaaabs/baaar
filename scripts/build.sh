@@ -11,12 +11,16 @@ DERIVED_DATA="${DERIVED_DATA:-$HOME/Library/Developer/Xcode/DerivedData/baaar-cl
 
 xcodegen generate --quiet
 mkdir -p build
+# a signing override applies to every target, the packages' resource bundles included, so it only
+# goes on the command line when it is asked for (project.yml already signs with Apple Development).
+OVERRIDES=()
+[[ -n "${CODE_SIGN_IDENTITY:-}" ]] && OVERRIDES+=("CODE_SIGN_IDENTITY=$CODE_SIGN_IDENTITY")
 if ! xcodebuild \
   -project baaar.xcodeproj \
   -scheme baaar \
   -configuration "$CONFIGURATION" \
   -derivedDataPath "$DERIVED_DATA" \
-  CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:-Apple Development}" \
+  ${OVERRIDES[@]+"${OVERRIDES[@]}"} \
   build > build/xcodebuild.log 2>&1; then
   grep -E "error:" build/xcodebuild.log >&2 || tail -30 build/xcodebuild.log >&2
   exit 1

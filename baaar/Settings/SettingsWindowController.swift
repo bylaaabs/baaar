@@ -53,6 +53,23 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         return window
     }
 
+    #if DEBUG
+    /// debug: every pane as png into the folder (`--render-settings <folder>`), to compare the look
+    /// before and after a change to the theme.
+    func renderPanes(to folder: URL) {
+        let window = window ?? makeWindow()
+        guard let view = window.contentView else { return }
+        for pane in SettingsPane.allCases {
+            navigation.pane = pane
+            view.layoutSubtreeIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+            guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }
+            view.cacheDisplay(in: view.bounds, to: rep)
+            try? rep.representation(using: .png, properties: [:])?.write(to: folder.appending(path: "settings-\(pane.rawValue).png"))
+        }
+    }
+    #endif
+
     func windowDidBecomeKey(_ notification: Notification) {
         reloader.reloadIfStale()
     }
