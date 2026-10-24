@@ -8,6 +8,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The first release
 
 ## [Unreleased]
 
+### Fixed
+
+- A hidden item whose app changed its icon kept showing the old picture for good. An item pictured
+  before its app last launched is pictured again the next time hidden items are, once.
+
 ## [0.1.0] - 2026-09-16
 
 The first release of baaar for macOS 27.

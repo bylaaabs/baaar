@@ -502,7 +502,8 @@ final class MenuBarController {
 
     // MARK: - Pictures
 
-    /// Whether an item in the Hidden or Always Hidden section has never been pictured and hasn't failed recently.
+    /// Whether an item in the Hidden or Always Hidden section has no current picture (never pictured, or
+    /// pictured before its app last launched) and hasn't failed recently.
     func hasHiddenItemsWithoutImages() async -> Bool {
         guard Permissions.hasScreenRecording else { return false }
         return !missingImages(in: await refreshSnapshot()).isEmpty
@@ -510,7 +511,7 @@ final class MenuBarController {
 
     private func missingImages(in snapshot: MenuBarSnapshot) -> [MenuBarItem] {
         manageableItems(in: snapshot).filter { item in
-            images.image(for: item) == nil && (captureFailures[item.id].map { Date().timeIntervalSince($0) > 3600 } ?? true)
+            (images.image(for: item) == nil || images.isStale(for: item)) && (captureFailures[item.id].map { Date().timeIntervalSince($0) > 3600 } ?? true)
         }
     }
 
@@ -550,7 +551,7 @@ final class MenuBarController {
             let drawn = await settledItems(batch.map(\.id), isCurrent: isCurrent)
             guard isCurrent() else { return }
             guard await images.capture(drawn) else { return }
-            for item in batch where images.image(for: item) == nil {
+            for item in batch where images.image(for: item) == nil || images.isStale(for: item) {
                 captureFailures[item.id] = Date()
             }
         }
