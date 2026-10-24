@@ -8,6 +8,8 @@ import ScreenCaptureKit
 @MainActor
 final class ItemImageCache {
     private var images: [String: NSImage] = [:]
+    /// When each picture was taken, to tell a picture older than the app that draws the item now.
+    private var takenAt: [String: Date] = [:]
     private let directory: URL
 
     init() {
@@ -17,9 +19,19 @@ final class ItemImageCache {
 
     func image(for item: MenuBarItem) -> NSImage? {
         if let image = images[item.id] { return image }
-        guard let image = NSImage(contentsOf: fileURL(for: item.id)) else { return nil }
+        let url = fileURL(for: item.id)
+        guard let image = NSImage(contentsOf: url) else { return nil }
         images[item.id] = image
+        takenAt[item.id] = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
         return image
+    }
+
+    /// Whether the item's picture was taken before its app last launched: an app that relaunches
+    /// (an update, most often) may draw a new icon, and a hidden item is never pictured again on its own.
+    func isStale(for item: MenuBarItem) -> Bool {
+        guard image(for: item) != nil, let taken = takenAt[item.id],
+              let launched = NSRunningApplication(processIdentifier: item.pid)?.launchDate else { return false }
+        return taken < launched
     }
 
     /// Whether a menu bar is on screen to picture: in full-screen spaces it hides until the pointer reaches the top.
@@ -68,6 +80,7 @@ final class ItemImageCache {
 
     private func store(_ image: NSImage, cgImage: CGImage, for id: String) {
         images[id] = image
+        takenAt[id] = Date()
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let rep = NSBitmapImageRep(cgImage: cgImage)
         rep.size = image.size // Stored as DPI, so the PNG reloads at point size on Retina.

@@ -10,7 +10,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The first release
 
 ### Changed
 
-- The app icon is the baaar wordmark, white on black, like caaapture's and taaab's, instead of the chevron and three dots.
+- The icon is the baaar wordmark, white on black, like caaapture's and taaab's, instead of the chevron and three dots.
+
+### Fixed
+
+- A hidden item whose app changed its icon kept showing the old picture for good. An item pictured
+  before its app last launched is pictured again the next time hidden items are, once.
 
 ## [0.1.0] - 2026-09-16
 
