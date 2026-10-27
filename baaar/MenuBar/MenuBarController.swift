@@ -309,11 +309,15 @@ final class MenuBarController {
         for item in known where !used.contains(item.id) && (item.isManageable || item.isOwn || item.bundleIdentifier == MenuBarItem.menuBarAgent) {
             entries.append(LayoutEntry(id: "ax:\(item.id)", weight: nil, item: item))
         }
-        let sorted = entries.sorted { lhs, rhs in
-            switch (lhs.weight, rhs.weight) {
-            case let (l?, r?) where l != r: l > r
-            default: (lhs.item.frame?.minX ?? 0) < (rhs.item.frame?.minX ?? 0)
-            }
+        // Entries with a weight follow the table; the rest slot in among them by frame. Comparing a weight
+        // with a frame directly isn't a consistent order, so the two are merged rather than sorted together.
+        func minX(_ entry: LayoutEntry) -> CGFloat { entry.item.frame?.minX ?? 0 }
+        var sorted = entries.filter { $0.weight != nil }.sorted { lhs, rhs in
+            (-(lhs.weight ?? 0), minX(lhs), lhs.id) < (-(rhs.weight ?? 0), minX(rhs), rhs.id)
+        }
+        for entry in entries.filter({ $0.weight == nil }).sorted(by: { (minX($0), $0.id) < (minX($1), $1.id) }) {
+            let index = sorted.firstIndex { minX($0) > minX(entry) } ?? sorted.endIndex
+            sorted.insert(entry, at: index)
         }
         layoutRank = Dictionary(sorted.enumerated().map { ($0.element.item.id, $0.offset) }) { first, _ in first }
         return sorted
