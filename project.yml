@@ -3,7 +3,7 @@ name: baaar
 options:
   bundleIdPrefix: com.laaabs
   deploymentTarget:
-    macOS: "26.0"
+    macOS: "27.0"
   createIntermediateGroups: true
   developmentLanguage: en
 
