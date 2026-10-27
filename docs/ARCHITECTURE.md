@@ -68,7 +68,7 @@ alone, baaar's own items are blanked, frames settle, and the batch is captured.
 |---|---|
 | `~/Library/Preferences/com.laaabs.baaar.plist` | sections, known bundles, display mode, chevron style, settings |
 | `~/Library/Caches/com.laaabs.baaar/` | PNG pictures of items |
-| `~/Library/Logs/baaar/` | `baaar.log`, and `diagnostics.txt` from `--diagnose` |
+| `~/Library/Logs/baaar/` | `baaar.log` (moved to `baaar.log.1` past 1 MB), and `diagnostics.txt` from `--diagnose` |
 
 See [PRIVACY.md](PRIVACY.md).
 

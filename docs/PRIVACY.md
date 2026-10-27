@@ -13,7 +13,7 @@ identifiers. It does not contact laaabs. servers: there are none.
 |---|---|---|
 | `~/Library/Preferences/com.laaabs.baaar.plist` | The section of every bundle and system item baaar has placed, the bundles it has seen, the display mode, the chevron style and the other settings | `defaults delete com.laaabs.baaar` |
 | `~/Library/Caches/com.laaabs.baaar/` | PNG pictures of menu bar items, showing whatever each item displayed when it was pictured | delete the folder; baaar pictures items again when needed |
-| `~/Library/Logs/baaar/baaar.log` | Errors and events, with bundle identifiers and item labels | delete the file |
+| `~/Library/Logs/baaar/baaar.log` and `baaar.log.1` | Errors and events, with bundle identifiers and item labels. Past 1 MB the log moves to `baaar.log.1`, replacing the one before | delete the files |
 | `~/Library/Logs/baaar/diagnostics.txt` | Written only when you run `baaar --diagnose`: screens, sections, every item's label and frame, and the MenuBarAgent tree | delete the file |
 
 Launch at login, when you turn it on, is registered with macOS through `SMAppService` and shows in
