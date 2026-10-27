@@ -16,6 +16,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The first release
 
 - A hidden bundle that launched after baaar showed in the menu bar until the next click on the chevron.
   It is now hidden as soon as it launches, and nothing is held once no hidden bundle is running.
+- Launch at login showed on when macOS refused to register baaar. It now shows what macOS did.
 - A hidden item whose app changed its icon kept showing the old picture for good. An item pictured
   before its app last launched is pictured again the next time hidden items are, once.
 
