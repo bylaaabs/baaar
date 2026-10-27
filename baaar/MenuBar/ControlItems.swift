@@ -36,10 +36,6 @@ final class ControlItems {
         chevronItem.button?.window?.screen ?? NSScreen.main
     }
 
-    var menuBarAppearance: NSAppearance? {
-        chevronItem.button?.effectiveAppearance
-    }
-
     /// Shows the chevron in the chosen style, pointing where hidden items appear.
     func setChevron(style: ChevronStyle, direction: ChevronDirection, hasHiddenItems: Bool) {
         let isOpen = direction == .right || direction == .up

@@ -5,28 +5,6 @@ import Observation
 @MainActor
 @Observable
 final class AppModel {
-    /// One app, or one of Apple's system items, with menu bar items. Sections apply per app:
-    /// macOS hides and shows whole bundles.
-    struct AppGroup: Identifiable, Equatable {
-        /// The app's bundle identifier, or `SystemItem.key` for Apple's system items.
-        let bundleIdentifier: String
-        let name: String
-        let section: MenuBarSection
-        /// Captured images of the app's items, left to right; empty when never captured.
-        let itemImages: [NSImage]
-        /// The app's own icon, shown when no item image exists.
-        let appIcon: NSImage?
-        /// Apple's system items (Clock, Wi-Fi, Control Center…) rather than an app.
-        let isSystem: Bool
-
-        var id: String { bundleIdentifier }
-
-        static func == (lhs: AppGroup, rhs: AppGroup) -> Bool {
-            lhs.bundleIdentifier == rhs.bundleIdentifier && lhs.name == rhs.name && lhs.section == rhs.section
-                && lhs.itemImages.elementsEqual(rhs.itemImages, by: ===) && lhs.appIcon === rhs.appIcon
-        }
-    }
-
     /// One item of the menu bar in the layout editor.
     struct LayoutItem: Identifiable, Equatable {
         /// The layout table id, or `ax:<item id>` when the table has no entry.
@@ -75,8 +53,6 @@ final class AppModel {
         Task { await reload() }
     }
 
-    /// Apps currently owning menu bar items, in menu bar order.
-    private(set) var groups: [AppGroup] = []
     private(set) var isRefreshing = false
     private(set) var hasAccessibility = Permissions.hasAccessibility
     private(set) var hasScreenRecording = Permissions.hasScreenRecording
@@ -147,21 +123,10 @@ final class AppModel {
         launchesAtLogin = Settings.launchesAtLogin
     }
 
-    func groups(in section: MenuBarSection) -> [AppGroup] {
-        groups.filter { $0.section == section }
-    }
-
-    /// Moves every item of an app to a section. Takes effect in the menu bar right away.
-    func move(_ bundleIdentifier: String, to section: MenuBarSection) {
-        controller?.setSection(section, forBundle: bundleIdentifier)
-        Task { await reload() }
-    }
-
     /// Re-reads the menu bar.
     func reload() async {
         refreshPermissions()
         guard let controller else { return }
-        groups = await controller.appGroups()
         hasLayoutAccess = MenuBarLayoutTable.hasAccess
         let restricting = controller.isRestricting
         layoutItems = await controller.layoutEntries().map { entry in

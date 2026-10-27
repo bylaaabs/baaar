@@ -6,14 +6,6 @@ enum MenuBarSection: String, CaseIterable, Sendable {
     case visible
     case hidden
     case alwaysHidden
-
-    var title: String {
-        switch self {
-        case .visible: "Visible"
-        case .hidden: "Hidden"
-        case .alwaysHidden: "Always Hidden"
-        }
-    }
 }
 
 /// How hidden items are shown when the chevron is clicked.
@@ -26,15 +18,6 @@ enum DisplayMode: String, CaseIterable, Sendable {
     case list
     /// A square grid, like the Windows notification area overflow.
     case grid
-
-    var title: String {
-        switch self {
-        case .menuBar: "In the Menu Bar"
-        case .bar: "Horizontal Bar"
-        case .list: "Vertical List"
-        case .grid: "Grid"
-        }
-    }
 }
 
 /// Where the chevron points. It points where hidden items go: sideways into the menu bar, down into a panel.
@@ -49,16 +32,6 @@ enum ChevronStyle: String, CaseIterable, Sendable {
     case triangle
     case circle
     case dots
-
-    var title: String {
-        switch self {
-        case .chevron: "Chevron"
-        case .arrow: "Arrow"
-        case .triangle: "Triangle"
-        case .circle: "Circle"
-        case .dots: "Dots"
-        }
-    }
 
     /// SF Symbol for a direction. Dots don't point anywhere, so they fill in while open instead.
     func symbolName(_ direction: ChevronDirection) -> String {

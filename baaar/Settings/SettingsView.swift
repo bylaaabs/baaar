@@ -139,8 +139,6 @@ private struct SettingsNavRow: View {
 }
 
 // MARK: - Copy
-//
-// The shared enums carry title-case names; the settings UI speaks lowercase.
 
 extension MenuBarSection {
     var settingsLabel: String {

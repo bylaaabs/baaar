@@ -45,11 +45,6 @@ final class VisibilityRestriction {
         issue()
     }
 
-    func release() {
-        concealedKeys = []
-        issue()
-    }
-
     private func scheduleRefresh() {
         refreshTask?.cancel()
         refreshTask = Task { [weak self] in
