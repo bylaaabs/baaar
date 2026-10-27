@@ -10,6 +10,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The first release
 
 ### Changed
 
+- baaar needs macOS 27 to open. It used to open on macOS 26, where it can hide nothing.
 - The icon is the baaar wordmark, white on black, like caaapture's and taaab's, instead of the chevron and three dots.
 
 ### Fixed
