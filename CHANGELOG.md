@@ -19,6 +19,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The first release
 - Launch at login showed on when macOS refused to register baaar. It now shows what macOS did.
 - The log grew for good, and lines written at the same time could mix. Past 1 MB it now moves to
   `baaar.log.1`, and lines are written one at a time.
+- The layout pane could list items in a different order from one read to the next when some had no
+  entry in macOS's layout table.
 - A hidden item whose app changed its icon kept showing the old picture for good. An item pictured
   before its app last launched is pictured again the next time hidden items are, once.
 
