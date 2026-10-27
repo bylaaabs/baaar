@@ -5,33 +5,33 @@ struct PermissionsPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            BrandBlock("permissions") {
+            BrandBlock(String(localized: "permissions")) {
                 VStack(alignment: .leading, spacing: 16) {
                     PermissionRow(
-                        title: "accessibility",
-                        badge: "required",
-                        message: "lists and opens menu bar items.",
+                        title: String(localized: "accessibility"),
+                        badge: String(localized: "required"),
+                        message: String(localized: "lists and opens menu bar items."),
                         systemImage: "accessibility",
                         isGranted: model.hasAccessibility,
                         grant: model.requestAccessibility
                     )
                     BrandHLine()
                     PermissionRow(
-                        title: "screen recording",
-                        badge: "optional",
-                        message: "shows the real icons in the bar; without it baaar shows each tool's own icon. baaar only captures the menu bar and never records video.",
+                        title: String(localized: "screen recording"),
+                        badge: String(localized: "optional"),
+                        message: String(localized: "shows the real icons in the bar; without it baaar shows each tool's own icon. baaar only captures the menu bar and never records video."),
                         systemImage: "rectangle.dashed.badge.record",
                         isGranted: model.hasScreenRecording,
                         grant: model.requestScreenRecording
                     )
                     BrandHLine()
                     PermissionRow(
-                        title: "menu bar layout",
-                        badge: "optional",
-                        message: "lets baaar reorder items by editing macos's layout file, without moving your cursor.",
+                        title: String(localized: "menu bar layout"),
+                        badge: String(localized: "optional"),
+                        message: String(localized: "lets baaar reorder items by editing macos's layout file, without moving your cursor."),
                         systemImage: "arrow.left.arrow.right",
                         isGranted: model.hasLayoutAccess,
-                        grantTitle: "grant…"
+                        grantTitle: String(localized: "grant…")
                     ) {
                         model.requestLayoutAccess()
                         // refreshPermissions doesn't cover the layout file; read it back.
@@ -66,7 +66,7 @@ private struct PermissionRow: View {
     let message: String
     let systemImage: String
     let isGranted: Bool
-    var grantTitle = "grant"
+    var grantTitle = String(localized: "grant")
     let grant: () -> Void
 
     var body: some View {

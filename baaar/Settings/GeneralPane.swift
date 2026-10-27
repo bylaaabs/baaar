@@ -10,7 +10,7 @@ struct GeneralPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            BrandBlock("show hidden items") {
+            BrandBlock(String(localized: "show hidden items")) {
                 HStack(spacing: 10) {
                     ForEach(DisplayMode.allCases, id: \.self) { mode in
                         DisplayModeCard(mode: mode, chevronStyle: model.chevronStyle, isSelected: model.displayMode == mode) {
@@ -20,8 +20,8 @@ struct GeneralPane: View {
                 }
             }
 
-            BrandBlock("bar color") {
-                BrandRow("color", detail: "the bar, list and grid use one of the laaabs. colors, or macos glass. on white, icons are drawn in black.") {
+            BrandBlock(String(localized: "bar color")) {
+                BrandRow(String(localized: "color"), detail: String(localized: "the bar, list and grid use one of the laaabs. colors, or macos glass. on white, icons are drawn in black.")) {
                     HStack(spacing: 10) {
                         ForEach(BarColor.allCases.filter(\.isSolid), id: \.self) { color in
                             BarColorSwatch(color: color, isSelected: model.barColor == color) {
@@ -38,9 +38,9 @@ struct GeneralPane: View {
                 .brandCard()
             }
 
-            BrandBlock("chevron") {
+            BrandBlock(String(localized: "chevron")) {
                 VStack(alignment: .leading, spacing: 16) {
-                    BrandRow("icon", detail: "points where hidden items appear: sideways in the menu bar, down for the bar, list and grid.") {
+                    BrandRow(String(localized: "icon"), detail: String(localized: "points where hidden items appear: sideways in the menu bar, down for the bar, list and grid.")) {
                         BrandSegmented(
                             selection: $model.chevronStyle,
                             options: ChevronStyle.allCases.map { style in
@@ -49,7 +49,7 @@ struct GeneralPane: View {
                         )
                     }
                     BrandHLine()
-                    BrandRow("new items go to", detail: "where baaar puts menu bar items it has not seen before.") {
+                    BrandRow(String(localized: "new items go to"), detail: String(localized: "where baaar puts menu bar items it has not seen before.")) {
                         BrandSegmented(
                             selection: $model.newAppSection,
                             options: MenuBarSection.allCases.map { .init(value: $0, label: $0.settingsLabel) }
@@ -59,14 +59,14 @@ struct GeneralPane: View {
                 .brandCard()
             }
 
-            BrandBlock("behavior") {
+            BrandBlock(String(localized: "behavior")) {
                 VStack(alignment: .leading, spacing: 16) {
-                    BrandRow("hide again automatically", detail: "in menu bar mode, hidden items tuck away when you click elsewhere or after 15 seconds away from the menu bar.") {
-                        BrandToggle(isOn: $model.autoRehide, label: "hide again automatically")
+                    BrandRow(String(localized: "hide again automatically"), detail: String(localized: "in menu bar mode, hidden items tuck away when you click elsewhere or after 15 seconds away from the menu bar.")) {
+                        BrandToggle(isOn: $model.autoRehide, label: String(localized: "hide again automatically"))
                     }
                     BrandHLine()
-                    BrandRow("launch at login") {
-                        BrandToggle(isOn: $model.launchesAtLogin, label: "launch at login")
+                    BrandRow(String(localized: "launch at login")) {
+                        BrandToggle(isOn: $model.launchesAtLogin, label: String(localized: "launch at login"))
                     }
                 }
                 .brandCard()

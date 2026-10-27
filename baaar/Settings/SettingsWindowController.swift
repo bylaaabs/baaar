@@ -41,7 +41,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             defer: false
         )
         window.contentViewController = hosting
-        window.title = "baaar settings"
+        window.title = String(localized: "baaar settings")
         window.applyBrandChrome(titleVisible: false, fullSizeContent: true)
         window.isReleasedWhenClosed = false
         window.contentMinSize = NSSize(width: 660, height: 460)
@@ -96,22 +96,22 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     private func makeMainMenu() -> NSMenu {
         let appMenu = NSMenu(title: "baaar")
-        appMenu.addItem(item("about baaar", #selector(showAbout(_:)), target: self))
+        appMenu.addItem(item(String(localized: "about baaar"), #selector(showAbout(_:)), target: self))
         appMenu.addItem(.separator())
-        appMenu.addItem(item("settings\u{2026}", #selector(showSettings(_:)), key: ",", target: self))
+        appMenu.addItem(item(String(localized: "settings…"), #selector(showSettings(_:)), key: ",", target: self))
         appMenu.addItem(.separator())
-        appMenu.addItem(item("hide baaar", #selector(NSApplication.hide(_:)), key: "h"))
+        appMenu.addItem(item(String(localized: "hide baaar"), #selector(NSApplication.hide(_:)), key: "h"))
         appMenu.addItem(.separator())
-        appMenu.addItem(item("quit baaar", #selector(NSApplication.terminate(_:)), key: "q"))
+        appMenu.addItem(item(String(localized: "quit baaar"), #selector(NSApplication.terminate(_:)), key: "q"))
 
-        let fileMenu = NSMenu(title: "file")
-        fileMenu.addItem(item("close", #selector(NSWindow.performClose(_:)), key: "w"))
+        let fileMenu = NSMenu(title: String(localized: "file"))
+        fileMenu.addItem(item(String(localized: "close"), #selector(NSWindow.performClose(_:)), key: "w"))
 
-        let editMenu = NSMenu(title: "edit")
-        editMenu.addItem(item("cut", #selector(NSText.cut(_:)), key: "x"))
-        editMenu.addItem(item("copy", #selector(NSText.copy(_:)), key: "c"))
-        editMenu.addItem(item("paste", #selector(NSText.paste(_:)), key: "v"))
-        editMenu.addItem(item("select all", #selector(NSText.selectAll(_:)), key: "a"))
+        let editMenu = NSMenu(title: String(localized: "edit"))
+        editMenu.addItem(item(String(localized: "cut"), #selector(NSText.cut(_:)), key: "x"))
+        editMenu.addItem(item(String(localized: "copy"), #selector(NSText.copy(_:)), key: "c"))
+        editMenu.addItem(item(String(localized: "paste"), #selector(NSText.paste(_:)), key: "v"))
+        editMenu.addItem(item(String(localized: "select all"), #selector(NSText.selectAll(_:)), key: "a"))
 
         let mainMenu = NSMenu(title: "Main Menu")
         for submenu in [appMenu, fileMenu, editMenu] {

@@ -8,6 +8,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The first release
 
 ## [Unreleased]
 
+### Added
+
+- baaar speaks Spanish: menus, settings and the bar follow the language macOS uses.
+
 ### Changed
 
 - baaar needs macOS 27 to open. It used to open on macOS 26, where it can hide nothing.

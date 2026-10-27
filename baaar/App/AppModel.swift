@@ -135,7 +135,7 @@ final class AppModel {
             let fixedSection: MenuBarSection? = item.isOwn ? .visible : isAppleModule ? (restricting ? .hidden : .visible) : nil
             return LayoutItem(
                 id: entry.id,
-                name: item.isOwn ? (item.identifier == ControlItems.Identifier.chevron ? "baaar chevron" : "baaar") : item.displayName,
+                name: item.isOwn ? (item.identifier == ControlItems.Identifier.chevron ? String(localized: "baaar chevron") : "baaar") : item.displayName,
                 section: fixedSection ?? item.sectionKey.map(Settings.section(forBundle:)) ?? .visible,
                 sectionKey: fixedSection == nil ? item.sectionKey : nil,
                 // baaar's own items and Apple's have no useful app icon; the clock's picture would show a frozen time.

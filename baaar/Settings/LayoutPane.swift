@@ -24,17 +24,17 @@ struct LayoutPane: View {
                 BrandCallout(
                     systemImage: "exclamationmark.triangle",
                     tint: BrandColors.danger,
-                    title: "hiding is not available on this mac",
-                    message: "this version of macos doesn't let baaar hide menu bar items, so every item stays visible."
+                    title: String(localized: "hiding is not available on this mac"),
+                    message: String(localized: "this version of macos doesn't let baaar hide menu bar items, so every item stays visible.")
                 )
             }
 
             if !model.hasAccessibility {
                 BrandCallout(
                     systemImage: "hand.raised",
-                    title: "accessibility access needed",
-                    message: "baaar needs accessibility access to list and open menu bar items.",
-                    actionTitle: "grant access",
+                    title: String(localized: "accessibility access needed"),
+                    message: String(localized: "baaar needs accessibility access to list and open menu bar items."),
+                    actionTitle: String(localized: "grant access"),
                     action: model.requestAccessibility
                 )
             }
@@ -42,9 +42,9 @@ struct LayoutPane: View {
             if !model.hasLayoutAccess {
                 BrandCallout(
                     systemImage: "arrow.left.arrow.right",
-                    title: "reordering needs layout access",
-                    message: "reordering needs access to the menu bar layout file. select com.apple.MenuBar.plist once and baaar can move items without touching your cursor.",
-                    actionTitle: "grant access",
+                    title: String(localized: "reordering needs layout access"),
+                    message: String(localized: "reordering needs access to the menu bar layout file. select com.apple.MenuBar.plist once and baaar can move items without touching your cursor."),
+                    actionTitle: String(localized: "grant access"),
                     action: model.requestLayoutAccess
                 )
             }
@@ -93,7 +93,7 @@ struct LayoutPane: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
-            PillButton("refresh icons", kind: .secondary) {
+            PillButton(String(localized: "refresh icons"), kind: .secondary) {
                 Task { await model.refreshIcons() }
             } leading: {
                 if model.isRefreshing {
@@ -157,7 +157,7 @@ struct LayoutPane: View {
             for section in MenuBarSection.allCases where section != item.section {
                 // Keep its place among the items already in that strip.
                 let index = before.count { $0.section == section }
-                entries.append(BrandMenu.Item("move to \(section.settingsLabel)", symbol: section.menuSymbol) {
+                entries.append(BrandMenu.Item(String(localized: "move to \(section.settingsLabel)"), symbol: section.menuSymbol) {
                     place(item.id, in: section, at: index, items: items)
                 })
             }
@@ -165,12 +165,12 @@ struct LayoutPane: View {
         let strip = items.filter { $0.section == item.section }
         if item.canReorder, let position = strip.firstIndex(where: { $0.id == item.id }) {
             if position > 0 {
-                entries.append(BrandMenu.Item("move to the start", symbol: "arrow.left.to.line") {
+                entries.append(BrandMenu.Item(String(localized: "move to the start"), symbol: "arrow.left.to.line") {
                     place(item.id, in: item.section, at: 0, items: items)
                 })
             }
             if position < strip.count - 1 {
-                entries.append(BrandMenu.Item("move to the end", symbol: "arrow.right.to.line") {
+                entries.append(BrandMenu.Item(String(localized: "move to the end"), symbol: "arrow.right.to.line") {
                     place(item.id, in: item.section, at: strip.count - 1, items: items)
                 })
             }

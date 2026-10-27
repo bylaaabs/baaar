@@ -10,7 +10,14 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     /// The sidebar name, lowercase like the rest of the UI.
-    var title: String { rawValue }
+    var title: String {
+        switch self {
+        case .general: String(localized: "general", comment: "settings pane")
+        case .layout: String(localized: "layout", comment: "settings pane")
+        case .permissions: String(localized: "permissions", comment: "settings pane")
+        case .about: String(localized: "about", comment: "settings pane")
+        }
+    }
 
     var systemImage: String {
         switch self {
@@ -143,9 +150,9 @@ private struct SettingsNavRow: View {
 extension MenuBarSection {
     var settingsLabel: String {
         switch self {
-        case .visible: "visible"
-        case .hidden: "hidden"
-        case .alwaysHidden: "always hidden"
+        case .visible: String(localized: "visible", comment: "menu bar section")
+        case .hidden: String(localized: "hidden", comment: "menu bar section")
+        case .alwaysHidden: String(localized: "always hidden", comment: "menu bar section")
         }
     }
 }
@@ -153,14 +160,22 @@ extension MenuBarSection {
 extension DisplayMode {
     var settingsLabel: String {
         switch self {
-        case .menuBar: "menu bar"
-        case .bar: "bar"
-        case .list: "list"
-        case .grid: "grid"
+        case .menuBar: String(localized: "menu bar", comment: "display mode")
+        case .bar: String(localized: "bar", comment: "display mode")
+        case .list: String(localized: "list", comment: "display mode")
+        case .grid: String(localized: "grid", comment: "display mode")
         }
     }
 }
 
 extension ChevronStyle {
-    var settingsLabel: String { rawValue }
+    var settingsLabel: String {
+        switch self {
+        case .chevron: String(localized: "chevron", comment: "chevron style")
+        case .arrow: String(localized: "arrow", comment: "chevron style")
+        case .triangle: String(localized: "triangle", comment: "chevron style")
+        case .circle: String(localized: "circle", comment: "chevron style")
+        case .dots: String(localized: "dots", comment: "chevron style")
+        }
+    }
 }

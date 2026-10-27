@@ -164,7 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func presentPanel(items: [MenuBarItem], snapshot: MenuBarSnapshot, alwaysHidden: Bool) {
         let entries = items.map { BarEntry(item: $0, image: controller.images.image(for: $0)) }
-        let message = entries.isEmpty ? (alwaysHidden ? "nothing always hidden - drag items there in settings" : "nothing hidden yet - open settings to hide items") : nil
+        let message = entries.isEmpty ? (alwaysHidden ? String(localized: "nothing always hidden - drag items there in settings") : String(localized: "nothing hidden yet - open settings to hide items")) : nil
         bar.show(entries: entries, message: message, mode: Settings.displayMode, anchor: Self.ownFrame(ControlItems.Identifier.chevron, in: snapshot), screen: controls.screen)
         controller.isPanelOpen = true
     }
@@ -182,14 +182,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showMenu(under identifier: String) {
         let menu = NSMenu()
         if controller.reveal == .none {
-            addItem(to: menu, "show hidden items", #selector(menuShowHidden))
-            addItem(to: menu, "show always hidden items", #selector(menuShowAll))
+            addItem(to: menu, String(localized: "show hidden items"), #selector(menuShowHidden))
+            addItem(to: menu, String(localized: "show always hidden items"), #selector(menuShowAll))
         } else {
-            addItem(to: menu, "hide items", #selector(menuHide))
+            addItem(to: menu, String(localized: "hide items"), #selector(menuHide))
         }
         menu.addItem(.separator())
-        addItem(to: menu, "settings…", #selector(menuSettings), key: ",")
-        addItem(to: menu, "quit baaar", #selector(NSApplication.terminate(_:)), key: "q").target = NSApp
+        addItem(to: menu, String(localized: "settings…"), #selector(menuSettings), key: ",")
+        addItem(to: menu, String(localized: "quit baaar"), #selector(NSApplication.terminate(_:)), key: "q").target = NSApp
 
         // Let AppKit place the menu under its status item, as for any menu bar menu: a menu popped
         // up at a computed point can land inside the menu bar and grow a scroll arrow.

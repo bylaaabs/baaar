@@ -22,7 +22,7 @@ final class ControlItems {
         appItem = Self.makeItem(autosaveName: "baaarToggle", identifier: Identifier.app)
         chevronItem = Self.makeItem(autosaveName: "baaarDivider", identifier: Identifier.chevron)
 
-        appItem.button?.image = Self.symbol("menubar.rectangle", description: "baaar settings")
+        appItem.button?.image = Self.symbol("menubar.rectangle", description: String(localized: "baaar settings"))
         appItem.button?.target = self
         appItem.button?.action = #selector(appClicked)
         appItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -39,7 +39,7 @@ final class ControlItems {
     /// Shows the chevron in the chosen style, pointing where hidden items appear.
     func setChevron(style: ChevronStyle, direction: ChevronDirection, hasHiddenItems: Bool) {
         let isOpen = direction == .right || direction == .up
-        let description = isOpen ? "Hide menu bar items" : "Show hidden menu bar items"
+        let description = isOpen ? String(localized: "hide menu bar items") : String(localized: "show hidden menu bar items")
         chevronItem.button?.image = Self.symbol(style.symbolName(direction), description: description)
         chevronItem.button?.appearsDisabled = !hasHiddenItems && !isOpen
     }
