@@ -165,7 +165,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func presentPanel(items: [MenuBarItem], snapshot: MenuBarSnapshot, alwaysHidden: Bool) {
         let entries = items.map { BarEntry(item: $0, image: controller.images.image(for: $0)) }
         let message = entries.isEmpty ? (alwaysHidden ? "nothing always hidden - drag items there in settings" : "nothing hidden yet - open settings to hide items") : nil
-        bar.show(entries: entries, message: message, mode: Settings.displayMode, anchor: Self.ownFrame(ControlItems.Identifier.chevron, in: snapshot), screen: controls.screen, appearance: controls.menuBarAppearance)
+        bar.show(entries: entries, message: message, mode: Settings.displayMode, anchor: Self.ownFrame(ControlItems.Identifier.chevron, in: snapshot), screen: controls.screen)
         controller.isPanelOpen = true
     }
 
@@ -216,16 +216,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func menuHide() {
         controller.setReveal(.none)
-    }
-
-    @objc private func menuSelectMode(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String, let mode = DisplayMode(rawValue: raw) else { return }
-        bar.close()
-        model.displayMode = mode
-    }
-
-    @objc private func menuRefreshImages() {
-        Task { await model.refreshIcons() }
     }
 
     @objc private func menuSettings() {

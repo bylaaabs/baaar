@@ -29,9 +29,7 @@ final class BarController {
 
     /// - Parameters:
     ///   - anchor: The chevron's frame in AppKit screen coordinates; the bar is centred under it.
-    ///   - appearance: The menu bar's appearance. The bar is always drawn dark now, so captured
-    ///     icons (white glyphs from a dark menu bar) read as they do there; kept for callers.
-    func show(entries: [BarEntry], message: String?, mode: DisplayMode, anchor: CGRect?, screen: NSScreen?, appearance: NSAppearance?) {
+    func show(entries: [BarEntry], message: String?, mode: DisplayMode, anchor: CGRect?, screen: NSScreen?) {
         close()
         shownItemIDs = entries.map(\.item.id)
         let anchorScreen = anchor.flatMap { anchor in NSScreen.screens.first { $0.frame.contains(NSPoint(x: anchor.midX, y: anchor.midY)) } }

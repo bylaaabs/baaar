@@ -121,7 +121,7 @@ final class MenuBarController {
         }
     }
 
-    /// In "In the Menu Bar" mode: hide again after a click elsewhere or time away from the menu bar.
+    /// In menu bar mode: hide again after a click elsewhere or time away from the menu bar.
     func startRehideMonitor() {
         guard Settings.autoRehide else { return }
         rehide = RehideMonitor { [weak self] in
@@ -234,31 +234,6 @@ final class MenuBarController {
         manageableItems(in: snapshot ?? self.snapshot)
             .filter { sections.contains(section(of: $0)) }
             .sorted { (layoutRank[$0.id] ?? .max, $0.frame?.minX ?? 0) < (layoutRank[$1.id] ?? .max, $1.frame?.minX ?? 0) }
-    }
-
-    /// Every app and system item in the menu bar, for the layout editor.
-    func appGroups() async -> [AppModel.AppGroup] {
-        let snapshot = await refreshSnapshot()
-        var order: [String] = []
-        var itemsByKey: [String: [MenuBarItem]] = [:]
-        for item in manageableItems(in: snapshot) {
-            guard let key = item.sectionKey else { continue }
-            if itemsByKey[key] == nil {
-                order.append(key)
-            }
-            itemsByKey[key, default: []].append(item)
-        }
-        return order.compactMap { key in
-            guard let items = itemsByKey[key], let first = items.first else { return nil }
-            return AppModel.AppGroup(
-                bundleIdentifier: key,
-                name: first.displayName,
-                section: Settings.section(forBundle: key),
-                itemImages: items.compactMap { images.image(for: $0) },
-                appIcon: first.appIcon,
-                isSystem: first.systemItem != nil
-            )
-        }
     }
 
     // MARK: - Layout
