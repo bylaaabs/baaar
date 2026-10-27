@@ -51,14 +51,28 @@ final class MenuBarController {
         self.controls = controls
         updateChevron()
         watchClockClicks()
-        // Keep a recent picture of the menu bar so the bar opens instantly.
+        // Keep a recent picture of the menu bar so the bar opens instantly, and place bundles seen for the first time.
         Task { [weak self] in
             while !Task.isCancelled {
-                // Reads the layout table too, so panels list items in the real order.
-                _ = await self?.layoutEntries()
+                guard let self else { return }
+                if self.needsBackgroundScan {
+                    // Reads the layout table too, so panels list items in the real order.
+                    _ = await self.layoutEntries()
+                }
                 try? await Task.sleep(for: .seconds(5))
             }
         }
+    }
+
+    /// With nothing hidden there's no bar to open, and with new items staying visible nothing to place,
+    /// so the background scan of every process can rest.
+    private var needsBackgroundScan: Bool {
+        !keys(in: [.hidden, .alwaysHidden]).isEmpty || Settings.newAppSection != .visible
+    }
+
+    /// Records what is in the menu bar now as seen, so changing where new items go applies only to bundles that appear afterwards.
+    func acknowledgeCurrentItems() async {
+        await refreshSnapshot()
     }
 
     // MARK: - Sections
