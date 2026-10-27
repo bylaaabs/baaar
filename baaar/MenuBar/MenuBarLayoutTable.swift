@@ -40,8 +40,8 @@ enum MenuBarLayoutTable {
     /// Asks the user to pick the table in an open panel, the only way to reach the protected container.
     static func requestAccess() -> Bool {
         let panel = NSOpenPanel()
-        panel.message = "select com.apple.MenuBar.plist and press grant access, so baaar can rearrange your menu bar"
-        panel.prompt = "grant access"
+        panel.message = String(localized: "select com.apple.MenuBar.plist and press grant access, so baaar can rearrange your menu bar")
+        panel.prompt = String(localized: "grant access")
         panel.directoryURL = url.deletingLastPathComponent()
         panel.nameFieldStringValue = url.lastPathComponent
         panel.canChooseFiles = true

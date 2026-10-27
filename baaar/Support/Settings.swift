@@ -92,15 +92,15 @@ enum SystemItem: Int, CaseIterable, Sendable {
 
     var title: String {
         switch self {
-        case .battery: "Battery"
-        case .bluetooth: "Bluetooth"
-        case .clock: "Clock"
-        case .displays: "Displays"
-        case .keyboard: "Keyboard Brightness"
-        case .sound: "Sound"
-        case .wifi: "Wi-Fi"
-        case .screenMirroring: "Screen Mirroring"
-        case .controlCenter: "Control Center"
+        case .battery: String(localized: "Battery", comment: "Apple menu bar item")
+        case .bluetooth: String(localized: "Bluetooth", comment: "Apple menu bar item")
+        case .clock: String(localized: "Clock", comment: "Apple menu bar item")
+        case .displays: String(localized: "Displays", comment: "Apple menu bar item")
+        case .keyboard: String(localized: "Keyboard Brightness", comment: "Apple menu bar item")
+        case .sound: String(localized: "Sound", comment: "Apple menu bar item")
+        case .wifi: String(localized: "Wi-Fi", comment: "Apple menu bar item")
+        case .screenMirroring: String(localized: "Screen Mirroring", comment: "Apple menu bar item")
+        case .controlCenter: String(localized: "Control Center", comment: "Apple menu bar item")
         }
     }
 }
@@ -114,7 +114,15 @@ enum BarColor: String, CaseIterable, Sendable {
     /// macOS's Liquid Glass, blurring whatever is behind the bar.
     case glass
 
-    var title: String { rawValue }
+    var title: String {
+        switch self {
+        case .black: String(localized: "black", comment: "bar color")
+        case .graphite: String(localized: "graphite", comment: "bar color")
+        case .cyan: String(localized: "cyan", comment: "bar color")
+        case .white: String(localized: "white", comment: "bar color")
+        case .glass: String(localized: "glass", comment: "bar color")
+        }
+    }
 
     /// The white surface draws item pictures as one-colour glyphs, so captured white icons stay legible.
     var tintsIcons: Bool {

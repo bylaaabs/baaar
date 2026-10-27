@@ -5,8 +5,8 @@ struct AboutPane: View {
     private var version: String {
         let info = Bundle.main.infoDictionary
         let short = info?["CFBundleShortVersionString"] as? String ?? "0.0.0"
-        guard let build = info?["CFBundleVersion"] as? String else { return "version \(short)" }
-        return "version \(short) (\(build))"
+        guard let build = info?["CFBundleVersion"] as? String else { return String(localized: "version \(short)") }
+        return String(localized: "version \(short) (\(build))")
     }
 
     var body: some View {
@@ -28,9 +28,9 @@ struct AboutPane: View {
 
             Spacer(minLength: 16)
 
-            BrandLink(title: "a tool by laaabs.", url: "https://laaabs.com", color: BrandColors.onTertiary)
+            BrandLink(title: String(localized: "a tool by laaabs."), url: "https://laaabs.com", color: BrandColors.onTertiary)
 
-            PillButton("quit baaar", kind: .destructive) {
+            PillButton(String(localized: "quit baaar"), kind: .destructive) {
                 NSApp.terminate(nil)
             }
             .padding(.top, 10)

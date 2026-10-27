@@ -47,9 +47,9 @@ struct LayoutStrip: View {
 
     private var subtitle: String {
         switch section {
-        case .visible: "always in the menu bar."
-        case .hidden: "shown when you click the chevron."
-        case .alwaysHidden: "shown when you ⌥ or ⌃ click the chevron."
+        case .visible: String(localized: "always in the menu bar.")
+        case .hidden: String(localized: "shown when you click the chevron.")
+        case .alwaysHidden: String(localized: "shown when you ⌥ or ⌃ click the chevron.")
         }
     }
 
@@ -245,8 +245,8 @@ private struct LayoutChip: View {
     private var help: String {
         guard item.allowedSections.count == 1, let only = item.allowedSections.first else { return item.name }
         return only == .visible
-            ? "\(item.name) - baaar's own items stay visible"
-            : "\(item.name) - macos hides this while anything is hidden, and shows it again when nothing is"
+            ? String(localized: "\(item.name) - baaar's own items stay visible")
+            : String(localized: "\(item.name) - macos hides this while anything is hidden, and shows it again when nothing is")
     }
 
     @ViewBuilder

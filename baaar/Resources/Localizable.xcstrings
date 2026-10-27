@@ -1,7 +1,1045 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-
+    "%@ - baaar's own items stay visible" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ - los ítems de baaar siempre están a la vista"
+          }
+        }
+      }
+    },
+    "%@ - macos hides this while anything is hidden, and shows it again when nothing is" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ - macos lo oculta mientras haya algo oculto, y lo vuelve a mostrar cuando no hay nada"
+          }
+        }
+      }
+    },
+    "%@ section" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sección %@"
+          }
+        }
+      }
+    },
+    "%lld" : {
+      "shouldTranslate" : false
+    },
+    "- settings" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "- ajustes"
+          }
+        }
+      }
+    },
+    "Battery" : {
+      "comment" : "Apple menu bar item",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Batería"
+          }
+        }
+      }
+    },
+    "Bluetooth" : {
+      "comment" : "Apple menu bar item",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bluetooth"
+          }
+        }
+      }
+    },
+    "Clock" : {
+      "comment" : "Apple menu bar item",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reloj"
+          }
+        }
+      }
+    },
+    "Control Center" : {
+      "comment" : "Apple menu bar item",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Centro de control"
+          }
+        }
+      }
+    },
+    "Displays" : {
+      "comment" : "Apple menu bar item",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pantallas"
+          }
+        }
+      }
+    },
+    "Keyboard Brightness" : {
+      "comment" : "Apple menu bar item",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brillo del teclado"
+          }
+        }
+      }
+    },
+    "Screen Mirroring" : {
+      "comment" : "Apple menu bar item",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicación de pantalla"
+          }
+        }
+      }
+    },
+    "Sound" : {
+      "comment" : "Apple menu bar item",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sonido"
+          }
+        }
+      }
+    },
+    "Wi-Fi" : {
+      "comment" : "Apple menu bar item",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wi-Fi"
+          }
+        }
+      }
+    },
+    "a tool by laaabs." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "una herramienta de laaabs."
+          }
+        }
+      }
+    },
+    "about" : {
+      "comment" : "settings pane",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "acerca de"
+          }
+        }
+      }
+    },
+    "about baaar" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "acerca de baaar"
+          }
+        }
+      }
+    },
+    "accessibility" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "accesibilidad"
+          }
+        }
+      }
+    },
+    "accessibility access needed" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "falta el acceso de accesibilidad"
+          }
+        }
+      }
+    },
+    "always hidden" : {
+      "comment" : "menu bar section",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "siempre oculto"
+          }
+        }
+      }
+    },
+    "always in the menu bar." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "siempre en la barra de menús."
+          }
+        }
+      }
+    },
+    "apple items other than wi-fi, bluetooth, battery, sound, displays, keyboard, screen mirroring, clock and control center can't be hidden: macos hides them itself while anything is hidden." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "los ítems de apple que no son wi-fi, bluetooth, batería, sonido, pantallas, teclado, duplicación de pantalla, reloj y centro de control no se pueden ocultar: macos los oculta por su cuenta mientras haya algo oculto."
+          }
+        }
+      }
+    },
+    "arrange your menu bar" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ordena tu barra de menús"
+          }
+        }
+      }
+    },
+    "arrow" : {
+      "comment" : "chevron style",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "flecha"
+          }
+        }
+      }
+    },
+    "baaar chevron" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "chevron de baaar"
+          }
+        }
+      }
+    },
+    "baaar needs accessibility access to list and open menu bar items." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "baaar necesita acceso de accesibilidad para listar y abrir los ítems de la barra de menús."
+          }
+        }
+      }
+    },
+    "baaar settings" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ajustes de baaar"
+          }
+        }
+      }
+    },
+    "bar" : {
+      "comment" : "display mode",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "barra"
+          }
+        }
+      }
+    },
+    "bar color" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "color de la barra"
+          }
+        }
+      }
+    },
+    "behavior" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "comportamiento"
+          }
+        }
+      }
+    },
+    "black" : {
+      "comment" : "bar color",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "negro"
+          }
+        }
+      }
+    },
+    "chevron" : {
+      "comment" : "chevron style",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "chevron"
+          }
+        }
+      }
+    },
+    "circle" : {
+      "comment" : "chevron style",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "círculo"
+          }
+        }
+      }
+    },
+    "click the chevron to show hidden items. ⌥ or ⌃ click it, or pick show always hidden items in its menu, to see only the always hidden ones. right-click it for the menu." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "haz clic en el chevron para mostrar los ítems ocultos. haz ⌥ o ⌃ clic, o elige mostrar los siempre ocultos en su menú, para ver solo los siempre ocultos. haz clic derecho para abrir el menú."
+          }
+        }
+      }
+    },
+    "close" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cerrar"
+          }
+        }
+      }
+    },
+    "color" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "color"
+          }
+        }
+      }
+    },
+    "copy" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "copiar"
+          }
+        }
+      }
+    },
+    "cut" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cortar"
+          }
+        }
+      }
+    },
+    "cyan" : {
+      "comment" : "bar color",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cian"
+          }
+        }
+      }
+    },
+    "dots" : {
+      "comment" : "chevron style",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "puntos"
+          }
+        }
+      }
+    },
+    "drag to reorder, or between strips to hide. every icon from the same tool moves together." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "arrastra para reordenar, o entre franjas para ocultar. los iconos de una misma herramienta se mueven juntos."
+          }
+        }
+      }
+    },
+    "drop items here" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "suelta ítems aquí"
+          }
+        }
+      }
+    },
+    "edit" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "edición"
+          }
+        }
+      }
+    },
+    "file" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "archivo"
+          }
+        }
+      }
+    },
+    "general" : {
+      "comment" : "settings pane",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "general"
+          }
+        }
+      }
+    },
+    "glass" : {
+      "comment" : "bar color",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cristal"
+          }
+        }
+      }
+    },
+    "grant" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "conceder"
+          }
+        }
+      }
+    },
+    "grant access" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "conceder acceso"
+          }
+        }
+      }
+    },
+    "granted" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "concedido"
+          }
+        }
+      }
+    },
+    "grant…" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "conceder…"
+          }
+        }
+      }
+    },
+    "graphite" : {
+      "comment" : "bar color",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "grafito"
+          }
+        }
+      }
+    },
+    "grid" : {
+      "comment" : "display mode",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cuadrícula"
+          }
+        }
+      }
+    },
+    "hidden" : {
+      "comment" : "menu bar section",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "oculto"
+          }
+        }
+      }
+    },
+    "hide again automatically" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "volver a ocultar solo"
+          }
+        }
+      }
+    },
+    "hide baaar" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ocultar baaar"
+          }
+        }
+      }
+    },
+    "hide items" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ocultar ítems"
+          }
+        }
+      }
+    },
+    "hide menu bar items" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ocultar ítems de la barra de menús"
+          }
+        }
+      }
+    },
+    "hiding is not available on this mac" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ocultar no está disponible en este mac"
+          }
+        }
+      }
+    },
+    "icon" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "icono"
+          }
+        }
+      }
+    },
+    "in menu bar mode, hidden items tuck away when you click elsewhere or after 15 seconds away from the menu bar." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en el modo barra de menús, los ítems ocultos se recogen al hacer clic en otro sitio o tras 15 segundos lejos de la barra de menús."
+          }
+        }
+      }
+    },
+    "launch at login" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "abrir al iniciar sesión"
+          }
+        }
+      }
+    },
+    "layout" : {
+      "comment" : "settings pane",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "disposición"
+          }
+        }
+      }
+    },
+    "lets baaar reorder items by editing macos's layout file, without moving your cursor." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "permite a baaar reordenar ítems editando el archivo de disposición de macos, sin mover el cursor."
+          }
+        }
+      }
+    },
+    "list" : {
+      "comment" : "display mode",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "lista"
+          }
+        }
+      }
+    },
+    "lists and opens menu bar items." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "lista y abre los ítems de la barra de menús."
+          }
+        }
+      }
+    },
+    "macos does not say when access changes, so this page checks every second while it is open." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macos no avisa cuando cambia un acceso, así que esta página lo comprueba cada segundo mientras está abierta."
+          }
+        }
+      }
+    },
+    "menu bar" : {
+      "comment" : "display mode",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "barra de menús"
+          }
+        }
+      }
+    },
+    "menu bar layout" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "disposición de la barra de menús"
+          }
+        }
+      }
+    },
+    "move to %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mover a %@"
+          }
+        }
+      }
+    },
+    "move to the end" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mover al final"
+          }
+        }
+      }
+    },
+    "move to the start" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mover al principio"
+          }
+        }
+      }
+    },
+    "new items go to" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "los ítems nuevos van a"
+          }
+        }
+      }
+    },
+    "nothing always hidden - drag items there in settings" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nada siempre oculto - arrastra ítems ahí en ajustes"
+          }
+        }
+      }
+    },
+    "nothing hidden yet - open settings to hide items" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aún no hay nada oculto - abre ajustes para ocultar ítems"
+          }
+        }
+      }
+    },
+    "optional" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "opcional"
+          }
+        }
+      }
+    },
+    "paste" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pegar"
+          }
+        }
+      }
+    },
+    "permissions" : {
+      "comment" : "settings pane",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "permisos"
+          }
+        }
+      }
+    },
+    "points where hidden items appear: sideways in the menu bar, down for the bar, list and grid." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "apunta adonde aparecen los ítems ocultos: de lado en la barra de menús, hacia abajo en la barra, la lista y la cuadrícula."
+          }
+        }
+      }
+    },
+    "quit baaar" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "salir de baaar"
+          }
+        }
+      }
+    },
+    "refresh icons" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "actualizar iconos"
+          }
+        }
+      }
+    },
+    "reordering needs access to the menu bar layout file. select com.apple.MenuBar.plist once and baaar can move items without touching your cursor." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "reordenar necesita acceso al archivo de disposición de la barra de menús. selecciona com.apple.MenuBar.plist una vez y baaar podrá mover ítems sin tocar el cursor."
+          }
+        }
+      }
+    },
+    "reordering needs layout access" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "reordenar necesita acceso a la disposición"
+          }
+        }
+      }
+    },
+    "required" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "obligatorio"
+          }
+        }
+      }
+    },
+    "screen recording" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "grabación de pantalla"
+          }
+        }
+      }
+    },
+    "select all" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "seleccionar todo"
+          }
+        }
+      }
+    },
+    "select com.apple.MenuBar.plist and press grant access, so baaar can rearrange your menu bar" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "selecciona com.apple.MenuBar.plist y pulsa conceder acceso, para que baaar pueda reordenar tu barra de menús"
+          }
+        }
+      }
+    },
+    "settings…" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ajustes…"
+          }
+        }
+      }
+    },
+    "show always hidden items" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mostrar ítems siempre ocultos"
+          }
+        }
+      }
+    },
+    "show hidden items" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mostrar ítems ocultos"
+          }
+        }
+      }
+    },
+    "show hidden menu bar items" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mostrar ítems ocultos de la barra de menús"
+          }
+        }
+      }
+    },
+    "shown when you click the chevron." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "se muestran al hacer clic en el chevron."
+          }
+        }
+      }
+    },
+    "shown when you ⌥ or ⌃ click the chevron." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "se muestran al hacer ⌥ o ⌃ clic en el chevron."
+          }
+        }
+      }
+    },
+    "shows the real icons in the bar; without it baaar shows each tool's own icon. baaar only captures the menu bar and never records video." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "muestra los iconos reales en la barra; sin él, baaar muestra el icono de cada herramienta. baaar solo captura la barra de menús y nunca graba vídeo."
+          }
+        }
+      }
+    },
+    "the bar, list and grid use one of the laaabs. colors, or macos glass. on white, icons are drawn in black." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la barra, la lista y la cuadrícula usan uno de los colores de laaabs., o el cristal de macos. sobre blanco, los iconos se dibujan en negro."
+          }
+        }
+      }
+    },
+    "this version of macos doesn't let baaar hide menu bar items, so every item stays visible." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "esta versión de macos no deja que baaar oculte ítems de la barra de menús, así que todos siguen a la vista."
+          }
+        }
+      }
+    },
+    "triangle" : {
+      "comment" : "chevron style",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "triángulo"
+          }
+        }
+      }
+    },
+    "version %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "versión %@"
+          }
+        }
+      }
+    },
+    "version %@ (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "version %1$@ (%2$@)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "versión %@ (%@)"
+          }
+        }
+      }
+    },
+    "visible" : {
+      "comment" : "menu bar section",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "visible"
+          }
+        }
+      }
+    },
+    "where baaar puts menu bar items it has not seen before." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dónde pone baaar los ítems de la barra de menús que no ha visto antes."
+          }
+        }
+      }
+    },
+    "white" : {
+      "comment" : "bar color",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "blanco"
+          }
+        }
+      }
+    }
   },
   "version" : "1.0"
 }
