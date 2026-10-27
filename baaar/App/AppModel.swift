@@ -105,7 +105,19 @@ final class AppModel {
 
     /// The section apps and system items get the first time baaar sees them.
     var newAppSection: MenuBarSection {
-        didSet { Settings.newAppSection = newAppSection }
+        didSet {
+            guard newAppSection != oldValue else { return }
+            // While nothing is hidden and new items stay visible, the menu bar isn't scanned in the background,
+            // so mark what is there now as seen before the new choice applies to newcomers.
+            let section = newAppSection
+            Task {
+                await controller?.acknowledgeCurrentItems()
+                // A quicker change after this one writes its own value.
+                if newAppSection == section {
+                    Settings.newAppSection = section
+                }
+            }
+        }
     }
 
     var autoRehide: Bool {
