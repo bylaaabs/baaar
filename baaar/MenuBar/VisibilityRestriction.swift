@@ -56,8 +56,12 @@ final class VisibilityRestriction {
             try? await Task.sleep(for: .milliseconds(300))
             guard let self, !Task.isCancelled else { return }
             let running = Self.runningBundles()
-            // Only a launched app the restriction doesn't know about needs a new assertion; quits change nothing.
-            if assertion != nil, !running.subtracting(allowedBundles).subtracting(concealedKeys).isEmpty {
+            let isHolding = assertion != nil || pending != nil
+            if isHolding != needsRestriction(running: running) {
+                // A concealed bundle launched while nothing was held, or the last one quit.
+                issue()
+            } else if isHolding, !running.subtracting(allowedBundles).subtracting(concealedKeys).isEmpty {
+                // A launched bundle the restriction doesn't know about needs to be allowed.
                 issue()
             }
         }
@@ -67,12 +71,15 @@ final class VisibilityRestriction {
         Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
     }
 
+    /// Whether anything concealed is on screen to hide: a running bundle or a system item.
+    /// Without it no restriction is held, since one also hides Apple modules and blocks Notification Center.
+    private func needsRestriction(running: Set<String>) -> Bool {
+        !concealedKeys.isDisjoint(with: running) || SystemItem.allCases.contains { concealedKeys.contains($0.key) }
+    }
+
     private func issue() {
         let running = Self.runningBundles()
-        let concealedSystem = SystemItem.allCases.filter { concealedKeys.contains($0.key) }
-        let concealedRunning = concealedKeys.intersection(running)
-        // With nothing to hide on screen, don't hold a restriction: it also hides Apple modules and blocks Notification Center.
-        guard Self.isAvailable, !(concealedRunning.isEmpty && concealedSystem.isEmpty) else {
+        guard Self.isAvailable, needsRestriction(running: running) else {
             invalidate(&assertion)
             invalidate(&pending)
             allowedBundles = []
