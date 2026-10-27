@@ -21,6 +21,11 @@ final class ItemImageCache {
         if let image = images[item.id] { return image }
         let url = fileURL(for: item.id)
         guard let image = NSImage(contentsOf: url) else { return nil }
+        // Pictures taken of a hidden menu bar are opaque boxes, not items; drop them so the item is pictured again.
+        if let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil), Self.isSolidBox(cgImage) {
+            try? FileManager.default.removeItem(at: url)
+            return nil
+        }
         images[item.id] = image
         takenAt[item.id] = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
         return image
@@ -48,6 +53,7 @@ final class ItemImageCache {
         guard let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true) else { return false }
         let bars = content.windows.filter { $0.title == "Menubar" && $0.isOnScreen && $0.frame.minY >= 0 }
         guard !bars.isEmpty else { return false }
+        var pictured = false
         for window in bars {
             let inside = items.filter { item in
                 guard let frame = item.frame else { return false }
@@ -62,6 +68,13 @@ final class ItemImageCache {
             config.captureResolution = .best
             let filter = SCContentFilter(desktopIndependentWindow: window)
             guard let strip = try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config) else { continue }
+            // The window is transparent around every item. A menu bar hidden in a full-screen space can still
+            // report its window on screen, and then captures as an opaque strip with nothing on it.
+            guard Self.hasTransparency(strip) else {
+                Log.write("menu bar capture is opaque; the menu bar isn't showing")
+                continue
+            }
+            pictured = true
             for item in inside {
                 guard let frame = item.frame else { continue }
                 let crop = CGRect(
@@ -75,7 +88,7 @@ final class ItemImageCache {
                 store(NSImage(cgImage: glyph, size: size), cgImage: glyph, for: item.id)
             }
         }
-        return true
+        return pictured
     }
 
     private func store(_ image: NSImage, cgImage: CGImage, for id: String) {
@@ -101,8 +114,48 @@ final class ItemImageCache {
     /// Crops an item capture to its visible pixels, dropping the padding the menu bar adds around it.
     ///
     /// Returns nil when there is nothing to show: a capture taken mid-animation or
-    /// of an item that is not on screen is fully transparent.
+    /// of an item that is not on screen is fully transparent, and one of a hidden
+    /// menu bar is fully opaque.
     private static func trimmed(_ image: CGImage) -> CGImage? {
+        let width = image.width
+        let height = image.height
+        guard let pixels = rgba(image) else { return nil }
+
+        // Rows in the buffer run top to bottom, matching CGImage.cropping(to:).
+        var minX = width, minY = height, maxX = -1, maxY = -1, opaque = 0, clear = 0
+        for y in 0..<height {
+            for x in 0..<width {
+                let alpha = pixels[(y * width + x) * 4 + 3]
+                guard alpha > 24 else {
+                    clear += 1
+                    continue
+                }
+                minX = min(minX, x); maxX = max(maxX, x)
+                minY = min(minY, y); maxY = max(maxY, y)
+                if alpha > 160 { opaque += 1 }
+            }
+        }
+        guard maxX >= minX, clear > 0, opaque >= max(4, width * height / 200) else { return nil }
+        return image.cropping(to: CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1))
+    }
+
+    /// Whether any pixel is (nearly) transparent, as the menu bar is around every item.
+    private static func hasTransparency(_ image: CGImage) -> Bool {
+        guard let pixels = rgba(image) else { return false }
+        return stride(from: 3, to: pixels.count, by: 4).contains { pixels[$0] <= 24 }
+    }
+
+    /// Whether every pixel is opaque and of one colour: a box, not an item's glyph.
+    private static func isSolidBox(_ image: CGImage) -> Bool {
+        guard let pixels = rgba(image) else { return false }
+        let first = Array(pixels[0..<4])
+        return stride(from: 0, to: pixels.count, by: 4).allSatisfy { index in
+            pixels[index + 3] > 160 && (0..<3).allSatisfy { abs(Int(pixels[index + $0]) - Int(first[$0])) <= 8 }
+        }
+    }
+
+    /// The image's pixels as premultiplied RGBA, rows top to bottom; nil when it can't be drawn.
+    private static func rgba(_ image: CGImage) -> [UInt8]? {
         let width = image.width
         let height = image.height
         guard width > 0, height > 0 else { return nil }
@@ -115,18 +168,6 @@ final class ItemImageCache {
             context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
             return true
         }
-        guard drawn else { return nil }
-
-        // Rows in the buffer run top to bottom, matching CGImage.cropping(to:).
-        var minX = width, minY = height, maxX = -1, maxY = -1, opaque = 0
-        for y in 0..<height {
-            for x in 0..<width where pixels[(y * width + x) * 4 + 3] > 24 {
-                minX = min(minX, x); maxX = max(maxX, x)
-                minY = min(minY, y); maxY = max(maxY, y)
-                if pixels[(y * width + x) * 4 + 3] > 160 { opaque += 1 }
-            }
-        }
-        guard maxX >= minX, opaque >= max(4, width * height / 200) else { return nil }
-        return image.cropping(to: CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1))
+        return drawn ? pixels : nil
     }
 }
