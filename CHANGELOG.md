@@ -24,6 +24,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The first release
   `baaar.log.1`, and lines are written one at a time.
 - The layout pane could list items in a different order from one read to the next when some had no
   entry in macOS's layout table.
+- Hidden items were pictured again only when baaar launched, so a bundle that relaunched with a new
+  icon, or a new bundle that went straight to hidden, showed an old picture or its owner's icon until baaar
+  restarted. They are now pictured a few seconds after the bundle launches.
 - A hidden item whose app changed its icon kept showing the old picture for good. An item pictured
   before its app last launched is pictured again the next time hidden items are, once.
 

@@ -46,11 +46,17 @@ final class MenuBarController {
     private var layoutRank: [String: Int] = [:]
 
     private var clockMonitor: Any?
+    private var launchObservation: NSKeyValueObservation?
+    private var missingPicturesTask: Task<Void, Never>?
 
     init(controls: ControlItems) {
         self.controls = controls
         updateChevron()
         watchClockClicks()
+        // Menu bar apps are usually agents, which don't always post launch notifications; watch the process list instead.
+        launchObservation = NSWorkspace.shared.observe(\.runningApplications, options: [.new]) { [weak self] _, _ in
+            Task { @MainActor in self?.scheduleMissingPictures() }
+        }
         // Keep a recent picture of the menu bar so the bar opens instantly, and place bundles seen for the first time.
         Task { [weak self] in
             while !Task.isCancelled {
@@ -506,6 +512,29 @@ final class MenuBarController {
         manageableItems(in: snapshot).filter { item in
             (images.image(for: item) == nil || images.isStale(for: item)) && (captureFailures[item.id].map { Date().timeIntervalSince($0) > 3600 } ?? true)
         }
+    }
+
+    /// Pictures items left without a current picture a little after a bundle launches, as at launch:
+    /// a relaunched bundle may draw a new icon, and a new one may have gone straight to a hidden section.
+    /// Waits while anything else is going on in the menu bar, for up to a minute.
+    private func scheduleMissingPictures() {
+        missingPicturesTask?.cancel()
+        missingPicturesTask = Task { [weak self] in
+            for _ in 0..<12 {
+                // Gives the bundle time to add its items, and the user time to finish with the menu bar.
+                try? await Task.sleep(for: .seconds(5))
+                guard !Task.isCancelled, let self else { return }
+                guard self.isIdle else { continue }
+                guard await self.hasHiddenItemsWithoutImages(), self.isIdle, !Task.isCancelled else { return }
+                await self.refreshImages(onlyMissing: true)
+                return
+            }
+        }
+    }
+
+    /// Nothing temporary running, nothing revealed and no bar open: the menu bar can be rearranged to picture items.
+    private var isIdle: Bool {
+        temporaryTask == nil && reveal == .none && !isPanelOpen
     }
 
     /// Pictures items without touching the cursor, a few at a time, each batch alone in the menu bar:
