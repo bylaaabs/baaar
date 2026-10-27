@@ -116,6 +116,11 @@ final class AppModel {
         didSet {
             guard launchesAtLogin != Settings.launchesAtLogin else { return }
             Settings.launchesAtLogin = launchesAtLogin
+            // macOS can refuse the change; show what it did rather than what was asked.
+            let actual = Settings.launchesAtLogin
+            if actual != launchesAtLogin {
+                launchesAtLogin = actual
+            }
         }
     }
 
