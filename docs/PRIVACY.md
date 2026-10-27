@@ -1,6 +1,6 @@
 # Privacy policy - baaar
 
-Last updated: 2026-09-15.
+Last updated: 2026-10-27.
 
 ## What we collect
 
@@ -12,6 +12,7 @@ identifiers. It does not contact laaabs. servers: there are none.
 | Where | What | How to remove it |
 |---|---|---|
 | `~/Library/Preferences/com.laaabs.baaar.plist` | The section of every bundle and system item baaar has placed, the bundles it has seen, the display mode, the chevron style and the other settings | `defaults delete com.laaabs.baaar` |
+| `~/Library/Group Containers/com.apple.MenuBar/Library/Preferences/com.apple.MenuBar.plist` | macOS's own file, not baaar's. With menu bar layout access, baaar reads the position of every item and writes new ones when you reorder items in the layout pane. Its preferences keep a bookmark to the file | `defaults delete com.laaabs.baaar menuBarLayoutBookmark` removes the access; the positions stay, as macOS uses them |
 | `~/Library/Caches/com.laaabs.baaar/` | PNG pictures of menu bar items, showing whatever each item displayed when it was pictured | delete the folder; baaar pictures items again when needed |
 | `~/Library/Logs/baaar/baaar.log` and `baaar.log.1` | Errors and events, with bundle identifiers and item labels. Past 1 MB the log moves to `baaar.log.1`, replacing the one before | delete the files |
 | `~/Library/Logs/baaar/diagnostics.txt` | Written only when you run `baaar --diagnose`: screens, sections, every item's label and frame, and the MenuBarAgent tree | delete the file |
@@ -37,6 +38,7 @@ will list it in the same release.
 
 - **Accessibility**, required, to list, open and picture menu bar items.
 - **Screen Recording**, optional, to picture menu bar items.
+- **Menu bar layout file**, optional, picked by you in an open panel, to read and reorder menu bar items.
 
 When each is asked for, and what happens without it: [PERMISSIONS.md](PERMISSIONS.md).
 

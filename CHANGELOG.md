@@ -24,6 +24,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The first release
 - A hidden item whose app changed its icon kept showing the old picture for good. An item pictured
   before its app last launched is pictured again the next time hidden items are, once.
 
+### Documentation
+
+- The privacy policy and the permissions page now cover the menu bar layout file: what baaar reads and
+  writes in it, and how to take the access back.
+
 ## [0.1.0] - 2026-09-16
 
 The first release of baaar for macOS 27.

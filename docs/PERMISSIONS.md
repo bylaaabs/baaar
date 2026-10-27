@@ -5,7 +5,7 @@ Every macOS permission baaar asks for, when it asks, and why.
 ## When baaar asks
 
 The laaabs. rule is to ask only when a person takes an action that needs the permission. baaar follows
-it for Screen Recording. **Accessibility is the exception**: baaar cannot list, hide or open a single
+it for Screen Recording and the menu bar layout file. **Accessibility is the exception**: baaar cannot list, hide or open a single
 item without it, so it asks at first launch.
 
 Grants belong to the code signature. System Settings lists them only for bundles in a regular location
@@ -38,6 +38,26 @@ such as `/Applications`, and a build signed with a different certificate is aske
 - **Without it:** everything works, and the bar, list, grid and layout pane show each owner's icon, or a
   symbol for Apple's system items, instead of the real item.
 - **macOS pane:** System Settings, Privacy & Security, Screen & System Audio Recording.
+
+## Menu bar layout file
+
+- **Optional.**
+- **Asked:** only when you press grant access in the layout pane, or grant in settings, permissions. An
+  open panel shows the file and you pick it yourself; baaar refuses any other file.
+- **Why:** macOS 27 keeps where every menu bar item sits in
+  `~/Library/Group Containers/com.apple.MenuBar/Library/Preferences/com.apple.MenuBar.plist`, a protected
+  container that only a file you pick can open.
+- **Used to:**
+  - read `TrailingItemPreferredPositions`, the position of every item, so the layout pane lists items in
+    their real order
+  - write new positions there when you reorder items in the layout pane, through `cfprefsd`, so the
+    menu bar re-sorts without moving the cursor
+  - keep a security-scoped bookmark to the file in baaar's preferences (`menuBarLayoutBookmark`), so
+    access survives a relaunch
+- **Never used to** read or write any other key of that file, or any other file in the container.
+- **Without it:** hiding and showing work as before. The layout pane moves bundles between sections, and
+  items keep their place within a section.
+- **To revoke:** `defaults delete com.laaabs.baaar menuBarLayoutBookmark`, then quit and reopen baaar.
 
 ## Things that need no prompt
 
