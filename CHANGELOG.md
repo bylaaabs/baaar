@@ -8,6 +8,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The first release
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-28
+
 ### Added
 
 - baaar speaks Spanish: menus, settings and the bar follow the language macOS uses.
@@ -35,8 +37,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The first release
 - Items pictured while the menu bar was hidden, in a full-screen space, showed as black boxes in the
   bar, list, grid and layout pane. Those captures are now refused, and black pictures already kept are
   dropped and taken again.
-- A hidden item whose app changed its icon kept showing the old picture for good. An item pictured
-  before its app last launched is pictured again the next time hidden items are, once.
+- A hidden item whose bundle changed its icon kept showing the old picture for good. An item pictured
+  before its bundle last launched is pictured again the next time hidden items are, once.
 
 ### Documentation
 
@@ -80,5 +82,6 @@ The first release of baaar for macOS 27.
   development builds are copied over once; privacy grants and cached pictures are not.
 - Licensed under the Apache License 2.0.
 
-[Unreleased]: https://github.com/bylaaabs/baaar/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/bylaaabs/baaar/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/bylaaabs/baaar/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/bylaaabs/baaar/releases/tag/v0.1.0
