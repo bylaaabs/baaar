@@ -109,7 +109,7 @@ longer hold. baaar is built on what still works:
 | `baaar/Resources/` | `Localizable.xcstrings` and `InfoPlist.xcstrings` (English and Spanish) |
 | `design/` | the design system and the Icon Composer icon `design/icon/baaar.icon` |
 | `docs/` | architecture, permissions, privacy, decision log |
-| `scripts/` | `build.sh`, `render-icon.swift` (renders the icon from `design/icon/baaar-glyph.svg`, the brand wordmark without its dot) |
+| `scripts/` | `build.sh`, `render-icon.swift` (renders the icon from the brand submodule's `brand/generated/baaar/icon/app-icon.svg`, the wordmark with its cyan dot) |
 
 `docs/ARCHITECTURE.md` has the longer version.
 
