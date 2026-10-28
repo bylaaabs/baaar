@@ -17,7 +17,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The first release
 - baaar needs macOS 27 to open. It used to open on macOS 26, where it can hide nothing.
 - While nothing is hidden and new items stay visible, baaar no longer reads the menu bar of every
   running bundle every 5 s.
-- The icon is the baaar wordmark, white on black, like caaapture's and taaab's, instead of the chevron and three dots.
+- The icon is the baaar wordmark, white on black with its cyan dot, as the brand draws it, instead of
+  the chevron and three dots.
 
 ### Fixed
 
