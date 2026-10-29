@@ -21,7 +21,8 @@ concurrency:
 jobs:
   label:
     name: Apply size label
-    runs-on: ubuntu-latest
+    # private repo: our runners (aaanvil-linux); public: github's (ubuntu-latest). bylaaabs/infra docs/runners.md
+    runs-on: ${{ github.event.repository.private && 'aaanvil-linux' || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - uses: actions/github-script@v9
