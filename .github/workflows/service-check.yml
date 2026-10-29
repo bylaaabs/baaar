@@ -11,8 +11,5 @@ permissions:
 
 jobs:
   check:
-    uses: bylaaabs/.github/.github/workflows/service-check.yml@main
+    uses: bylaaabs/.github/.github/workflows/service-check.yml@ci/runner-input
     secrets: inherit
-    # a public repo: never on our own runners (the default, aaanvil-linux).
-    with:
-      runner: ubuntu-latest

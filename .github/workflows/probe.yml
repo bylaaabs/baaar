@@ -1,0 +1,16 @@
+name: runner probe (test only)
+
+on:
+  push:
+    branches: [test/aaanvil-runner, ci/github-hosted-runner]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  direct:
+    runs-on: ${{ github.event.repository.private && 'aaanvil-linux' || 'ubuntu-latest' }}
+    steps:
+      - run: echo "event=${{ github.event_name }} private=${{ github.event.repository.private }} visibility=${{ github.event.repository.visibility }} runner=$RUNNER_NAME env=${{ runner.environment }}"
+  reusable:
+    if: github.event_name == 'pull_request'
+    uses: bylaaabs/.github/.github/workflows/pr-title.yml@ci/runner-input
