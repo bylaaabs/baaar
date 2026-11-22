@@ -8,6 +8,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The first release
 
 ## [Unreleased]
 
+### Fixed
+
+- baaar no longer quits when a menu bar item changes its label while baaar reads it, which happened
+  most often as a bundle launched. Every hidden item used to come back to the menu bar until baaar was
+  opened again.
+
 ## [0.1.1] - 2026-10-28
 
 ### Added
