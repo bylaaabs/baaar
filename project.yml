@@ -44,6 +44,9 @@ targets:
     dependencies:
       - package: LaaabsKit
         product: LaaabsKit
+    scheme:
+      testTargets:
+        - baaarTests
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.laaabs.baaar
@@ -54,3 +57,16 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: baaar
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
         INFOPLIST_KEY_NSHumanReadableCopyright: "© 2026 laaabs."
+
+  # logic tests: they compile the files they test, so no host is launched and nothing in the menu bar
+  # is hidden while they run.
+  baaarTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: baaarTests
+      - path: baaar/Items/ItemLabel.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.laaabs.baaar.tests
+        GENERATE_INFOPLIST_FILE: YES
