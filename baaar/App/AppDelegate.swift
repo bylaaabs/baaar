@@ -12,20 +12,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        #if DEBUG
+        // before anything that touches the menu bar or writes a setting: a render beside a running
+        // baaar adds no items to the menu bar and leaves the defaults as they were
+        if let index = CommandLine.arguments.firstIndex(of: "--render-settings"), CommandLine.arguments.count > index + 1 {
+            let folder = URL(filePath: CommandLine.arguments[index + 1])
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            SettingsWindowController(model: model).renderPanes(to: folder)
+            exit(0)
+        }
+        #endif
         Settings.migrateFromLegacyDomain()
         Settings.migrateLegacySections()
         MenuBarLayoutTable.restoreAccess()
         controller = MenuBarController(controls: ControlItems())
         model.controller = controller
         settingsWindow = SettingsWindowController(model: model)
-        #if DEBUG
-        if let index = CommandLine.arguments.firstIndex(of: "--render-settings"), CommandLine.arguments.count > index + 1 {
-            let folder = URL(filePath: CommandLine.arguments[index + 1])
-            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            settingsWindow.renderPanes(to: folder)
-            exit(0)
-        }
-        #endif
         controls.onAppClick = { [weak self] event in self?.appIconClicked(event) }
         controls.onChevronClick = { [weak self] event in self?.chevronClicked(event) }
         bar.onSelect = { [weak self] item in
