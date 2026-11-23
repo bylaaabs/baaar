@@ -92,7 +92,7 @@ enum ItemScanner {
                 pid: app.pid,
                 bundleIdentifier: app.bundleIdentifier,
                 appName: app.name,
-                label: firstString(of: element, [kAXTitleAttribute, kAXDescriptionAttribute]),
+                label: ItemLabel.first(of: [kAXTitleAttribute, kAXDescriptionAttribute]) { AX.value(element, $0) },
                 identifier: identifier,
                 frame: AX.frame(element),
                 isPressable: role == "AXMenuBarItem",
@@ -101,13 +101,6 @@ enum ItemScanner {
         }
         return result
     }
-}
-
-private func firstString(of element: AXUIElement, _ attributes: [String]) -> String? {
-    attributes.lazy
-        .compactMap { (AX.value(element, $0) as String?)?.nilIfEmpty }
-        .first
-        .map { $0.components(separatedBy: .newlines)[0] }
 }
 
 enum AX {

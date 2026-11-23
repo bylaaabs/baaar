@@ -151,8 +151,18 @@ CONFIGURATION=Release scripts/build.sh --install   # copy to /Applications and r
 
 ## Testing
 
-There is no test target yet. Changes are verified on a real macOS 27 Mac, with Accessibility granted,
-and with Screen Recording both granted and denied when the change touches pictures.
+`baaarTests` holds logic tests (Swift Testing) for code that needs no menu bar. They compile the files
+they test instead of loading baaar into a host, so nothing hides while they run. Pull logic worth a
+test out into a file with no AppKit or Accessibility calls, and add that file to the target in
+`project.yml`.
+
+```sh
+xcodegen generate && xcodebuild -project baaar.xcodeproj -scheme baaar \
+  -derivedDataPath ~/Library/Developer/Xcode/DerivedData/baaar-cli test
+```
+
+Everything else is verified on a real macOS 27 Mac, with Accessibility granted, and with Screen
+Recording both granted and denied when the change touches pictures.
 
 - **Debug commands.** DEBUG builds listen for distributed notifications named
   `com.laaabs.baaar.debug.<command>`, with an optional string argument as the notification object.

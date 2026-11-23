@@ -42,8 +42,8 @@ CONFIGURATION=Release scripts/build.sh --install   # copy to /Applications and r
 Build signed products outside `~/Desktop`: extended attributes there make `codesign` reject the bundle.
 `scripts/build.sh` already keeps DerivedData in `~/Library/Developer/Xcode/DerivedData/baaar-cli`.
 
-There is no test target yet. Verify on a real macOS 27 Mac; the DEBUG-only notification commands in
-[AGENTS.md](AGENTS.md#testing) drive baaar from a script.
+`baaarTests` holds the logic tests; [AGENTS.md](AGENTS.md#testing) has the command. Everything else is
+verified on a real macOS 27 Mac; the DEBUG-only notification commands there drive baaar from a script.
 
 ## Branches
 

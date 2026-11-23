@@ -24,6 +24,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The first release
 
 ### Fixed
 
+- baaar no longer quits when a menu bar item changes its label while baaar reads it, which happened
+  most often as a bundle launched. Every hidden item used to come back to the menu bar until baaar was
+  opened again.
 - A hidden bundle that launched after baaar showed in the menu bar until the next click on the chevron.
   It is now hidden as soon as it launches, and nothing is held once no hidden bundle is running.
 - Launch at login showed on when macOS refused to register baaar. It now shows what macOS did.
