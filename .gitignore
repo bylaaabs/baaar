@@ -11,3 +11,9 @@ xcuserdata/
 *.provisionprofile
 *.cer
 AppStoreConnect*.json
+
+# build output and signing material, wherever they land
+.build/
+target/
+*.dmg
+*.p8
