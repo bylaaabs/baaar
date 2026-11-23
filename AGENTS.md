@@ -31,7 +31,7 @@ Rules:
 - The company is `laaabs.` with the trailing dot, lowercase. Handle `@bylaaabs`, domain `laaabs.com`.
 - The bundle identifier is `com.laaabs.baaar`. Anything derived from it (the cache folder, debug
   notification names, uniform type identifiers) uses the same prefix.
-- Taglines: `a tool by laaabs.` in the UI, `By laaabs.` in the README. Do not write new ones.
+- Tagline: `a tool by laaabs.`, in the UI and at the end of the README (linking laaabs.com/tools/baaar). Do not write new ones.
 
 ## Voice
 
@@ -44,7 +44,9 @@ Rules:
   the thing. For other programs' items, say "bundle" or name the owner.
 - **Numbers:** one to nine in words, numerals from 10. Versions, sizes, shortcuts, percentages and
   durations are always numerals, with SI spacing (`50 MB`, `150 ms`).
-- **Headings in docs are sentence case.** UI copy is fully lowercase and terse.
+- **Docs and UI copy are lowercase**, headings included (proper nouns and platform names excepted: macOS,
+  MenuBarAgent, ScreenCaptureKit, Outfit). UI copy is terse. This file is the one exception until it is
+  rewritten; new prose follows the rule.
 - **Every user-visible string goes through `Localizable.xcstrings`**, in English and Spanish, from the
   first commit that adds it.
 
