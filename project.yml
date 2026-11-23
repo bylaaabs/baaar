@@ -12,7 +12,7 @@ options:
 packages:
   LaaabsKit:
     url: https://github.com/bylaaabs/ui-swift
-    revision: 094de0f9ecd14c28edd3ccd9f44d7dd14246146f
+    revision: c19b4b244d64a1636970ddfb3098cbe429c4b377
 
 settings:
   base:
