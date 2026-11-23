@@ -1,11 +1,9 @@
 # Branch protection
 
-## Status: not applied yet
+## Status: applied
 
-`main` is **not** protected on GitHub until the ruleset below is applied to the new `bylaaabs/baaar`.
+The ruleset below, `protect main`, is active on `bylaaabs/baaar` since 2026-11-23 (ruleset id 27929103).
 The repository is public, so rulesets are available on the organisation's Free plan.
-
-Until it is applied, the rules in `CONTRIBUTING.md` are the honour system. **They still apply.**
 
 ## How to turn it on
 
