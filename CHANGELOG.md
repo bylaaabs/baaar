@@ -8,7 +8,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The first release
 
 ## [Unreleased]
 
-## [0.1.1] - 2026-10-28
+## [0.1.1] - 2026-11-26
 
 ### Added
 
