@@ -7,13 +7,16 @@
 #   DERIVED_DATA   Xcode's build folder, outside the repository. Files under
 #                  ~/Desktop carry extended attributes that make codesign
 #                  reject a bundle, so never point it back inside the repo.
-#   SIGN_IDENTITY  the Developer ID Application identity; "-" means ad-hoc,
-#                  which is only good for a local dry run.
+#   TEAM_ID        the apple team, 3862GT8D5W unless set.
+#   SIGN_IDENTITY  the Developer ID Application identity, from
+#                  DEVELOPER_ID_APPLICATION or the team's own; "-" means
+#                  ad-hoc, which is only good for a local dry run.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DIST="${DIST:-$ROOT/dist}"
 DERIVED_DATA="${DERIVED_DATA:-$HOME/Library/Developer/Xcode/DerivedData/baaar-release}"
-SIGN_IDENTITY="${DEVELOPER_ID_APPLICATION:-Developer ID Application}"
+TEAM_ID="${TEAM_ID:-3862GT8D5W}"
+SIGN_IDENTITY="${DEVELOPER_ID_APPLICATION:-Developer ID Application: Ángel Martín Domínguez ($TEAM_ID)}"
 APP_NAME="baaar"
 BUNDLE_ID="com.laaabs.baaar"
 REPO_SLUG="bylaaabs/baaar"

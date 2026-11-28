@@ -9,8 +9,9 @@
 # bundle inside must have been stapled before zipping).
 #
 # Credentials, one of:
-#   - a keychain profile: NOTARY_PROFILE (default "baaar"), stored once with
-#       xcrun notarytool store-credentials baaar --key AuthKey.p8 --key-id ID --issuer UUID
+#   - a keychain profile: NOTARY_PROFILE (default "laaabs-notary", shared by
+#     every laaabs app), stored once with
+#       xcrun notarytool store-credentials laaabs-notary --key AuthKey.p8 --key-id ID --issuer UUID
 #   - an App Store Connect API key: APPSTORE_CONNECT_API_KEY_PATH (.p8),
 #     APPSTORE_CONNECT_API_KEY_ID and APPSTORE_CONNECT_API_ISSUER_ID.
 # The API key envs win when all three are set (that is what CI does).
@@ -35,7 +36,7 @@ if [[ -n "${APPSTORE_CONNECT_API_KEY_PATH:-}" && -n "${APPSTORE_CONNECT_API_KEY_
   CREDS=(--key "$APPSTORE_CONNECT_API_KEY_PATH" --key-id "$APPSTORE_CONNECT_API_KEY_ID" --issuer "$APPSTORE_CONNECT_API_ISSUER_ID")
   CRED_KIND="API key $APPSTORE_CONNECT_API_KEY_ID"
 else
-  NOTARY_PROFILE="${NOTARY_PROFILE:-baaar}"
+  NOTARY_PROFILE="${NOTARY_PROFILE:-laaabs-notary}"
   CREDS=(--keychain-profile "$NOTARY_PROFILE")
   CRED_KIND="keychain profile \"$NOTARY_PROFILE\""
   if ! xcrun notarytool history "${CREDS[@]}" >/dev/null 2>&1; then

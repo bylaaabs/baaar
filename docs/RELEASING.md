@@ -29,16 +29,17 @@ Check the certificate is there and valid:
 security find-identity -v -p codesigning | grep "Developer ID Application"
 ```
 
-If more than one Developer ID identity is listed, export `DEVELOPER_ID_APPLICATION` with the exact
+The scripts sign as `Developer ID Application: Ángel Martín Domínguez (3862GT8D5W)`. If the
+certificate has another name, export `DEVELOPER_ID_APPLICATION` with the exact
 name in quotes before running the scripts.
 
 ### Store the notary credentials once
 
 `notarytool` keeps the API key in the keychain under a profile name. The scripts use the profile
-`baaar` unless `NOTARY_PROFILE` says otherwise:
+`laaabs-notary`, the one every laaabs app shares, unless `NOTARY_PROFILE` says otherwise:
 
 ```sh
-xcrun notarytool store-credentials baaar \
+xcrun notarytool store-credentials laaabs-notary \
   --key ~/Downloads/AuthKey_XXXXXXXXXX.p8 \
   --key-id XXXXXXXXXX \
   --issuer 00000000-0000-0000-0000-000000000000
@@ -64,8 +65,9 @@ Shared settings live in `lib.sh`:
 - `DERIVED_DATA` defaults to `~/Library/Developer/Xcode/DerivedData/baaar-release`. It must stay
   outside `~/Desktop` and outside the repository: files there carry extended attributes that make
   `codesign` reject the bundle. `build-release.sh` refuses such a path.
-- `DEVELOPER_ID_APPLICATION` defaults to `Developer ID Application`, which `codesign` resolves when
-  the keychain holds exactly one. `-` signs ad-hoc, for a dry run on a Mac without the certificate.
+- `DEVELOPER_ID_APPLICATION` defaults to `Developer ID Application: Ángel Martín Domínguez (3862GT8D5W)`,
+  the team's certificate (`TEAM_ID`, default `3862GT8D5W`). `-` signs ad-hoc, for a dry run on a Mac
+  without the certificate.
 - `DIST` defaults to `dist/`, which belongs in `.gitignore` next to `build/`. Nothing in it is ever
   committed.
 - The build number (`CURRENT_PROJECT_VERSION`) is `git rev-list --count HEAD`, so every release has

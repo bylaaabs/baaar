@@ -5,8 +5,8 @@
 #
 # Writes dist/baaar.app and build/xcodebuild-release.log. Environment:
 #   VERSION                   overrides MARKETING_VERSION from project.yml
-#   DEVELOPER_ID_APPLICATION  signing identity (default "Developer ID Application";
-#                             "-" signs ad-hoc for a local dry run)
+#   DEVELOPER_ID_APPLICATION  signing identity (default "Developer ID Application: Ángel
+#                             Martín Domínguez (3862GT8D5W)"; "-" signs ad-hoc for a local dry run)
 #   TEAM_ID                   the apple team (default 3862GT8D5W); the kit's resource bundle needs it
 #   DERIVED_DATA              build folder, outside the repository (see lib.sh)
 #   DIST                      output folder (default dist/)
@@ -32,7 +32,7 @@ case "$DERIVED_DATA" in
 esac
 
 if [[ "$SIGN_IDENTITY" != "-" ]] \
-  && ! security find-identity -v -p codesigning 2>/dev/null | grep -q "$SIGN_IDENTITY"; then
+  && ! security find-identity -v -p codesigning 2>/dev/null | grep -qF "$SIGN_IDENTITY"; then
   die "no valid identity matching \"$SIGN_IDENTITY\" in the keychain. Set DEVELOPER_ID_APPLICATION to the exact name, or \"-\" for an ad-hoc dry run"
 fi
 
@@ -54,7 +54,7 @@ if ! xcodebuild \
   CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
   CODE_SIGN_STYLE=Manual \
   CODE_SIGN_IDENTITY="$SIGN_IDENTITY" \
-  DEVELOPMENT_TEAM="${TEAM_ID:-3862GT8D5W}" \
+  DEVELOPMENT_TEAM="$TEAM_ID" \
   ENABLE_HARDENED_RUNTIME=YES \
   OTHER_CODE_SIGN_FLAGS="${OTHER_CODE_SIGN_FLAGS:---timestamp}" \
   > "$LOG" 2>&1; then
